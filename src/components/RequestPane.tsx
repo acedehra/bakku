@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { RequestData, HttpMethod, AuthType } from "../types";
+import { Trash2 } from "lucide-react";
+import {Button} from "@/components/ui/button";
 
 interface RequestPaneProps {
   method: HttpMethod;
@@ -18,7 +20,7 @@ interface RequestPaneProps {
   loading: boolean;
 }
 
-type RequestTab = "Body" | "Params" | "Headers" | "Auth" | "Info";
+type RequestTab = "Body" | "Params" | "Headers" | "Auth";
 
 export function RequestPane({
   method,
@@ -55,6 +57,12 @@ export function RequestPane({
     onHeadersChange({ ...headers, [newKey]: "" });
   };
 
+  const deleteHeader = (key: string) => {
+    const newHeaders = { ...headers };
+    delete newHeaders[key];
+    onHeadersChange(newHeaders);
+  };
+
   const updateParam = (key: string, value: string) => {
     const newParams = { ...params };
     if (value.trim() === "") {
@@ -70,18 +78,7 @@ export function RequestPane({
     onParamsChange({ ...params, [newKey]: "" });
   };
 
-  const buildUrlWithParams = () => {
-    if (Object.keys(params).length === 0) return url;
-    const urlObj = new URL(url);
-    Object.entries(params).forEach(([key, value]) => {
-      if (key && value) {
-        urlObj.searchParams.set(key, value);
-      }
-    });
-    return urlObj.toString();
-  };
-
-  const tabs: RequestTab[] = ["Body", "Params", "Headers", "Auth", "Info"];
+  const tabs: RequestTab[] = ["Body", "Params", "Headers", "Auth"];
 
   return (
     <div className="flex-1 h-screen flex flex-col bg-background border-r border-border">
@@ -183,7 +180,7 @@ export function RequestPane({
         {activeTab === "Headers" && (
           <div className="space-y-2">
             {Object.entries(headers).map(([key, value]) => (
-              <div key={key} className="flex gap-2">
+              <div key={key} className="flex gap-2 items-center">
                 <input
                   type="text"
                   placeholder="Header name"
@@ -203,6 +200,13 @@ export function RequestPane({
                   onChange={(e) => updateHeader(key, e.target.value)}
                   className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
+                
+                  <Button 
+                  onClick={() => deleteHeader(key)}
+                  variant="outline" size="icon" aria-label="Delete header" title="Delete header">
+                    
+                 <Trash2/>
+                </Button>
               </div>
             ))}
             <button
@@ -304,26 +308,6 @@ export function RequestPane({
                   />
                 </div>
               </>
-            )}
-          </div>
-        )}
-        {activeTab === "Info" && (
-          <div className="space-y-4 text-sm">
-            <div>
-              <div className="font-medium mb-1">Method</div>
-              <div className="text-muted-foreground">{method}</div>
-            </div>
-            <div>
-              <div className="font-medium mb-1">URL</div>
-              <div className="text-muted-foreground break-all">{url}</div>
-            </div>
-            {Object.keys(params).length > 0 && (
-              <div>
-                <div className="font-medium mb-1">Full URL with Params</div>
-                <div className="text-muted-foreground break-all">
-                  {buildUrlWithParams()}
-                </div>
-              </div>
             )}
           </div>
         )}
