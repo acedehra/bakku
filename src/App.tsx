@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import "./App.css";
 import { HistorySidebar } from "./components/HistorySidebar";
 import { RequestPane } from "./components/RequestPane";
 import { ResponsePane } from "./components/ResponsePane";
+import { ResizeHandle } from "./components/ResizeHandle";
 import {
   HttpMethod,
   RequestData,
@@ -14,6 +15,7 @@ import {
 
 const HISTORY_STORAGE_KEY = "kordix_request_history";
 const MAX_HISTORY_ITEMS = 100;
+const PANEL_WIDTHS_STORAGE_KEY = "kordix_panel_widths";
 
 function App() {
   useEffect(() => {
@@ -23,6 +25,45 @@ function App() {
       document.documentElement.classList.remove("dark");
     };
   }, []);
+
+  // Load panel widths from localStorage
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const stored = localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.sidebarWidth || 256;
+      }
+    } catch {
+      // Ignore errors
+    }
+    return 256;
+  });
+
+  const [responseWidth, setResponseWidth] = useState(() => {
+    try {
+      const stored = localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.responseWidth || 450;
+      }
+    } catch {
+      // Ignore errors
+    }
+    return 450;
+  });
+
+  // Save panel widths to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PANEL_WIDTHS_STORAGE_KEY,
+        JSON.stringify({ sidebarWidth, responseWidth })
+      );
+    } catch (err) {
+      console.error("Failed to save panel widths to localStorage", err);
+    }
+  }, [sidebarWidth, responseWidth]);
 
   const [method, setMethod] = useState<HttpMethod>("GET");
   const [url, setUrl] = useState("https://jsonplaceholder.typicode.com/todos/1");
@@ -300,13 +341,24 @@ function App() {
     setError(null);
   };
 
+  const handleSidebarResize = useCallback((deltaX: number) => {
+    setSidebarWidth((prev) => Math.max(200, Math.min(600, prev + deltaX)));
+  }, []);
+
+  const handleResponseResize = useCallback((deltaX: number) => {
+    setResponseWidth((prev) => Math.max(300, Math.min(800, prev - deltaX)));
+  }, []);
+
   return (
     <div className="h-screen bg-background text-foreground flex overflow-hidden">
-      <HistorySidebar
-        history={history}
-        selectedId={selectedHistoryId}
-        onSelect={handleHistorySelect}
-      />
+      <div style={{ width: `${sidebarWidth}px` }} className="h-screen flex-shrink-0">
+        <HistorySidebar
+          history={history}
+          selectedId={selectedHistoryId}
+          onSelect={handleHistorySelect}
+        />
+      </div>
+      <ResizeHandle onResize={handleSidebarResize} />
       <RequestPane
         method={method}
         url={url}
@@ -323,7 +375,10 @@ function App() {
         onSend={sendRequest}
         loading={loading}
       />
-      <ResponsePane response={response} error={error} loading={loading} />
+      <ResizeHandle onResize={handleResponseResize} />
+      <div style={{ width: `${responseWidth}px` }} className="h-screen flex-shrink-0">
+        <ResponsePane response={response} error={error} loading={loading} />
+      </div>
     </div>
   );
 }

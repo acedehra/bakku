@@ -38,7 +38,7 @@ export function HistorySidebar({
   };
 
   return (
-    <div className="w-64 h-screen flex flex-col bg-sidebar border-r border-sidebar-border">
+    <div className="w-full h-screen flex flex-col bg-sidebar border-r border-sidebar-border">
       <div className="p-3 border-b border-sidebar-border">
         <input
           type="text"

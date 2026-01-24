@@ -37,7 +37,7 @@ export function ResponsePane({
   const tabs: ResponseTab[] = ["Pretty", "Headers", "Info"];
 
   return (
-    <div className="flex-1 h-screen flex flex-col bg-background">
+    <div className="w-full h-screen flex flex-col bg-background border-l border-border">
       {response && (
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-4 mb-4">

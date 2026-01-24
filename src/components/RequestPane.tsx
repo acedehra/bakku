@@ -147,7 +147,7 @@ export function RequestPane({
   const tabs: RequestTab[] = ["Body", "Params", "Headers", "Auth"];
 
   return (
-    <div className="flex-1 h-screen flex flex-col bg-background border-r border-border">
+    <div className="flex-1 h-screen flex flex-col bg-background">
       <div className="p-4 border-b border-border">
         <div className="flex gap-2 mb-4">
           <select
