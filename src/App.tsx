@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import "./App.css";
 import { HistorySidebar } from "./components/HistorySidebar";
@@ -79,6 +79,12 @@ function App() {
     null
   );
 
+  // Refs to prevent infinite loops when syncing URL and params
+  const isUpdatingFromParams = useRef(false);
+  const isUpdatingFromUrl = useRef(false);
+  const lastProcessedUrl = useRef<string>('');
+  const lastProcessedParams = useRef<string>('');
+
   // Load history from localStorage on mount
   useEffect(() => {
     try {
@@ -101,20 +107,198 @@ function App() {
     }
   }, [history]);
 
-  const buildUrlWithParams = (baseUrl: string): string => {
-    if (Object.keys(params).length === 0) return baseUrl;
-    try {
-      const urlObj = new URL(baseUrl);
-      Object.entries(params).forEach(([key, value]) => {
-        if (key && value) {
-          urlObj.searchParams.set(key, value);
-        }
-      });
-      return urlObj.toString();
-    } catch {
-      return baseUrl;
-    }
+  // Check if URL has a protocol
+  const hasProtocol = (url: string): boolean => {
+    return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url);
   };
+
+  // Extract base URL (without query params) from a full URL
+  const getBaseUrl = (fullUrl: string): string => {
+    if (!fullUrl.trim()) return fullUrl;
+    
+    // If URL has a protocol, use URL constructor
+    if (hasProtocol(fullUrl)) {
+      try {
+        const urlObj = new URL(fullUrl);
+        return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+      } catch {
+        // Fall through to manual extraction
+      }
+    }
+    
+    // Manual extraction for URLs without protocol or if URL constructor fails
+    const queryIndex = fullUrl.indexOf('?');
+    if (queryIndex !== -1) {
+      return fullUrl.substring(0, queryIndex);
+    }
+    return fullUrl;
+  };
+
+  // Parse query params from URL (handles URLs with or without protocol)
+  const parseUrlParams = (fullUrl: string): Record<string, string> => {
+    if (!fullUrl.trim()) return {};
+    
+    // If URL has a protocol, try using URL constructor
+    if (hasProtocol(fullUrl)) {
+      try {
+        const urlObj = new URL(fullUrl);
+        const parsedParams: Record<string, string> = {};
+        urlObj.searchParams.forEach((value, key) => {
+          parsedParams[key] = value;
+        });
+        return parsedParams;
+      } catch {
+        // Fall through to manual parsing
+      }
+    }
+    
+    // Manual parsing for URLs without protocol or if URL constructor fails
+    const queryIndex = fullUrl.indexOf('?');
+    if (queryIndex === -1) return {};
+    
+    const queryString = fullUrl.substring(queryIndex + 1);
+    const parsedParams: Record<string, string> = {};
+    const pairs = queryString.split('&');
+    
+    for (const pair of pairs) {
+      if (!pair) continue; // Skip empty pairs
+      const equalIndex = pair.indexOf('=');
+      if (equalIndex === -1) {
+        // No equals sign, treat as key with empty value
+        const key = pair;
+        if (key) {
+          try {
+            parsedParams[decodeURIComponent(key)] = '';
+          } catch {
+            parsedParams[key] = '';
+          }
+        }
+      } else {
+        const key = pair.substring(0, equalIndex);
+        const value = pair.substring(equalIndex + 1);
+        if (key) {
+          try {
+            const decodedKey = decodeURIComponent(key);
+            const decodedValue = value ? decodeURIComponent(value) : '';
+            parsedParams[decodedKey] = decodedValue;
+          } catch {
+            // If decoding fails, use raw values
+            parsedParams[key] = value || '';
+          }
+        }
+      }
+    }
+    
+    return parsedParams;
+  };
+
+  // Build full URL with params
+  const buildUrlWithParams = (baseUrl: string, queryParams: Record<string, string>): string => {
+    if (Object.keys(queryParams).length === 0) return baseUrl;
+    if (!baseUrl.trim()) return baseUrl;
+    
+    // If URL has a protocol, try using URL constructor
+    if (hasProtocol(baseUrl)) {
+      try {
+        const urlObj = new URL(baseUrl);
+        
+        // Clear existing search params and add new ones
+        urlObj.search = '';
+        Object.entries(queryParams).forEach(([key, value]) => {
+          if (key) {
+            // Allow empty values to preserve params while user is typing
+            urlObj.searchParams.set(key, value || '');
+          }
+        });
+        
+        return urlObj.toString();
+      } catch {
+        // Fall through to manual building
+      }
+    }
+    
+    // Manual building for URLs without protocol or if URL constructor fails
+    const queryPairs: string[] = [];
+    Object.entries(queryParams).forEach(([key, value]) => {
+      if (key) {
+        // Allow empty values
+        queryPairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(value || '')}`);
+      }
+    });
+    
+    if (queryPairs.length === 0) return baseUrl;
+    
+    // Remove existing query params from baseUrl if any
+    const baseWithoutQuery = baseUrl.split('?')[0];
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseWithoutQuery}${separator}${queryPairs.join('&')}`;
+  };
+
+  // Update URL when params change
+  useEffect(() => {
+    if (isUpdatingFromUrl.current) {
+      isUpdatingFromUrl.current = false;
+      return;
+    }
+
+    const paramsStr = JSON.stringify(params);
+    // Skip if we've already processed these exact params
+    if (lastProcessedParams.current === paramsStr) {
+      return;
+    }
+
+    isUpdatingFromParams.current = true;
+    lastProcessedParams.current = paramsStr;
+    
+    try {
+      const baseUrl = getBaseUrl(url);
+      const newUrl = buildUrlWithParams(baseUrl, params);
+      // Only update if URL actually changed
+      if (newUrl !== url) {
+        lastProcessedUrl.current = newUrl;
+        setUrl(newUrl);
+      }
+    } catch {
+      // Ignore errors - if building fails, keep current URL
+    }
+    
+    // Reset flag synchronously after scheduling the update
+    isUpdatingFromParams.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
+  // Parse URL and update params when URL changes
+  useEffect(() => {
+    if (isUpdatingFromParams.current) {
+      isUpdatingFromParams.current = false;
+      return;
+    }
+
+    // Skip if we've already processed this exact URL
+    if (lastProcessedUrl.current === url) {
+      return;
+    }
+
+    isUpdatingFromUrl.current = true;
+    lastProcessedUrl.current = url;
+    
+    try {
+      const urlParams = parseUrlParams(url);
+      const newParamsStr = JSON.stringify(urlParams);
+      // Only update if params actually changed to avoid unnecessary re-renders
+      const currentParamsStr = JSON.stringify(params);
+      if (currentParamsStr !== newParamsStr) {
+        lastProcessedParams.current = newParamsStr;
+        setParams(urlParams);
+      }
+    } catch {
+      // Ignore errors - if parsing fails, keep current params
+    }
+    
+    // Reset flag synchronously after scheduling the update
+    isUpdatingFromUrl.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
   const buildAuthHeaders = (authConfig: AuthConfig): Record<string, string> => {
     const authHeaders: Record<string, string> = {};
@@ -145,7 +329,8 @@ function App() {
       // Validate URL format before making the request
       let requestUrl: string;
       try {
-        requestUrl = buildUrlWithParams(url);
+        // URL already contains params, so use it directly
+        requestUrl = url;
         new URL(requestUrl);
       } catch {
         setError(
@@ -218,10 +403,11 @@ function App() {
 
       setResponse(responseData);
 
-      // Save to history
+      // Save to history (store base URL without params)
+      const baseUrl = getBaseUrl(url);
       const requestData: RequestData = {
         method,
-        url,
+        url: baseUrl,
         headers,
         params,
         body,
@@ -295,10 +481,11 @@ function App() {
 
       setError(errorMessage);
 
-      // Save failed request to history (timing captured but not used for failed requests)
+      // Save failed request to history (store base URL without params)
+      const baseUrl = getBaseUrl(url);
       const requestData: RequestData = {
         method,
-        url,
+        url: baseUrl,
         headers,
         params,
         body,
@@ -326,8 +513,16 @@ function App() {
   }
 
   const handleHistorySelect = (item: RequestHistoryItem) => {
+    // Reset tracking refs when loading from history
+    isUpdatingFromParams.current = true;
+    isUpdatingFromUrl.current = true;
+    
     setMethod(item.requestData.method);
-    setUrl(item.requestData.url);
+    // Build full URL with params when loading from history
+    const fullUrl = buildUrlWithParams(item.requestData.url, item.requestData.params);
+    lastProcessedUrl.current = fullUrl;
+    lastProcessedParams.current = JSON.stringify(item.requestData.params);
+    setUrl(fullUrl);
     setHeaders(item.requestData.headers);
     setParams(item.requestData.params);
     setBody(item.requestData.body);
@@ -339,14 +534,20 @@ function App() {
       setResponse(null);
     }
     setError(null);
+    
+    // Reset flags after a brief delay to allow state updates
+    setTimeout(() => {
+      isUpdatingFromParams.current = false;
+      isUpdatingFromUrl.current = false;
+    }, 0);
   };
 
   const handleSidebarResize = useCallback((deltaX: number) => {
-    setSidebarWidth((prev) => Math.max(200, Math.min(600, prev + deltaX)));
+    setSidebarWidth((prev: number) => Math.max(200, Math.min(600, prev + deltaX)));
   }, []);
 
   const handleResponseResize = useCallback((deltaX: number) => {
-    setResponseWidth((prev) => Math.max(300, Math.min(800, prev - deltaX)));
+    setResponseWidth((prev: number) => Math.max(300, Math.min(800, prev - deltaX)));
   }, []);
 
   return (
