@@ -81,10 +81,10 @@ function App() {
         method,
         url,
         timestamp: Date.now(),
-        status: responseData.status,
-        statusText: responseData.statusText,
+        status: null,
+        statusText: null,
         requestData,
-        responseData,
+        responseData: null,
       };
 
       addToHistory(historyItem);
