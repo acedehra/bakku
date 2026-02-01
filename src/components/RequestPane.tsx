@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { RequestData, HttpMethod, AuthType, Environment } from "../types";
 import { Trash2, FileText, List, Settings2, ShieldCheck, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { VariableInput } from "./VariableInput";
 
 interface RequestPaneProps {
   method: HttpMethod;
@@ -57,6 +58,8 @@ export function RequestPane({
   const [justAddedHeader, setJustAddedHeader] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showToken, setShowToken] = useState(false);
+
+  const activeEnv = environments.find(e => e.id === activeEnvId) || null;
 
   const canHaveBody = method !== "GET" && method !== "HEAD";
 
@@ -215,17 +218,17 @@ export function RequestPane({
               </option>
             ))}
           </select>
-          <input
-            type="text"
+          <VariableInput
             value={url}
+            environment={activeEnv}
             onClick={() => {
               if (url.includes('?')) {
                 setActiveTab("Params");
               }
             }}
-            onChange={(e) => onUrlChange(e.target.value)}
+            onChange={(val) => onUrlChange(val)}
             placeholder="https://api.example.com/resource"
-            className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all"
+            className="flex-1"
           />
           <button
             onClick={onSend}
@@ -269,12 +272,14 @@ export function RequestPane({
         {activeTab === "Body" && (
           <div className="space-y-2">
             {canHaveBody ? (
-              <textarea
+              <VariableInput
+                type="textarea"
                 value={body}
-                onChange={(e) => onBodyChange(e.target.value)}
+                environment={activeEnv}
+                onChange={(val) => onBodyChange(val)}
                 rows={20}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder='{"title": "New item"}'
+                className="w-full"
               />
             ) : (
               <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -287,34 +292,34 @@ export function RequestPane({
           <div className="space-y-2">
             {Object.entries(params).map(([key, value], index) => (
               <div key={`param-${index}-${key}`} className="flex gap-2 items-center group p-1.5 rounded-md hover:bg-accent/30 focus-within:bg-accent/40 transition-colors">
-                <input
+                <VariableInput
                   ref={(el) => {
                     if (el) {
-                      paramKeyInputRefs.current.set(index, el);
+                      paramKeyInputRefs.current.set(index, el as HTMLInputElement);
                     }
                   }}
-                  type="text"
                   placeholder="Key"
                   value={key}
-                  onChange={(e) => {
-                    const input = e.target;
-                    const cursorPos = input.selectionStart;
-                    setFocusedParamIndex(index);
-                    setParamCursorPos(cursorPos);
+                  environment={activeEnv}
+                  onChange={(val) => {
+                    const input = paramKeyInputRefs.current.get(index);
+                    const cursorPos = input?.selectionStart ?? null;
                     const newParams = { ...params };
                     delete newParams[key];
-                    const newKey = e.target.value;
-                    newParams[newKey] = value;
+                    newParams[val] = value;
                     onParamsChange(newParams);
+                    // Update cursor status tracking
+                    setFocusedParamIndex(index);
+                    setParamCursorPos(cursorPos);
                   }}
-                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex-1"
                 />
-                <input
-                  type="text"
+                <VariableInput
                   placeholder="Value"
                   value={value}
-                  onChange={(e) => updateParam(key, e.target.value)}
-                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  environment={activeEnv}
+                  onChange={(val) => updateParam(key, val)}
+                  className="flex-1"
                 />
                 <Button
                   onClick={() => deleteParam(key)}
@@ -335,34 +340,33 @@ export function RequestPane({
           <div className="space-y-2">
             {Object.entries(headers).map(([key, value], index) => (
               <div key={`header-${index}-${key}`} className="flex gap-2 items-center group p-1.5 rounded-md hover:bg-accent/30 focus-within:bg-accent/40 transition-colors">
-                <input
+                <VariableInput
                   ref={(el) => {
                     if (el) {
-                      headerKeyInputRefs.current.set(index, el);
+                      headerKeyInputRefs.current.set(index, el as HTMLInputElement);
                     }
                   }}
-                  type="text"
                   placeholder="Header name"
                   value={key}
-                  onChange={(e) => {
-                    const input = e.target;
-                    const cursorPos = input.selectionStart;
-                    setFocusedHeaderIndex(index);
-                    setHeaderCursorPos(cursorPos);
+                  environment={activeEnv}
+                  onChange={(val) => {
+                    const input = headerKeyInputRefs.current.get(index);
+                    const cursorPos = input?.selectionStart ?? null;
                     const newHeaders = { ...headers };
                     delete newHeaders[key];
-                    const newKey = e.target.value;
-                    newHeaders[newKey] = value;
+                    newHeaders[val] = value;
                     onHeadersChange(newHeaders);
+                    setFocusedHeaderIndex(index);
+                    setHeaderCursorPos(cursorPos);
                   }}
-                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex-1"
                 />
-                <input
-                  type="text"
+                <VariableInput
                   placeholder="Header value"
                   value={value}
-                  onChange={(e) => updateHeader(key, e.target.value)}
-                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  environment={activeEnv}
+                  onChange={(val) => updateHeader(key, val)}
+                  className="flex-1"
                 />
 
                 <Button
@@ -407,13 +411,13 @@ export function RequestPane({
                   <label className="text-sm font-medium mb-2 block">
                     Username
                   </label>
-                  <input
-                    type="text"
+                  <VariableInput
                     value={auth.username || ""}
-                    onChange={(e) =>
-                      onAuthChange({ ...auth, username: e.target.value })
+                    environment={activeEnv}
+                    onChange={(val) =>
+                      onAuthChange({ ...auth, username: val })
                     }
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full"
                   />
                 </div>
                 <div className="p-3 rounded-lg border border-border/40 focus-within:border-primary/50 focus-within:bg-primary/5 transition-all shadow-sm">
@@ -421,13 +425,14 @@ export function RequestPane({
                     Password
                   </label>
                   <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
+                    <VariableInput
                       value={auth.password || ""}
-                      onChange={(e) =>
-                        onAuthChange({ ...auth, password: e.target.value })
+                      environment={activeEnv}
+                      onChange={(val) =>
+                        onAuthChange({ ...auth, password: val })
                       }
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 pr-10 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full"
+                      type={showPassword ? "text" : "password"}
                     />
                     <button
                       type="button"
@@ -444,13 +449,14 @@ export function RequestPane({
               <div className="p-3 rounded-lg border border-border/40 focus-within:border-primary/50 focus-within:bg-primary/5 transition-all shadow-sm">
                 <label className="text-sm font-medium mb-2 block">Token</label>
                 <div className="relative">
-                  <input
-                    type={showToken ? "text" : "password"}
+                  <VariableInput
                     value={auth.token || ""}
-                    onChange={(e) =>
-                      onAuthChange({ ...auth, token: e.target.value })
+                    environment={activeEnv}
+                    onChange={(val) =>
+                      onAuthChange({ ...auth, token: val })
                     }
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 pr-10 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full"
+                    type={showToken ? "text" : "password"}
                   />
                   <button
                     type="button"
@@ -468,26 +474,26 @@ export function RequestPane({
                   <label className="text-sm font-medium mb-2 block">
                     Header Name
                   </label>
-                  <input
-                    type="text"
+                  <VariableInput
                     value={auth.headerName || ""}
-                    onChange={(e) =>
-                      onAuthChange({ ...auth, headerName: e.target.value })
+                    environment={activeEnv}
+                    onChange={(val) =>
+                      onAuthChange({ ...auth, headerName: val })
                     }
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full"
                   />
                 </div>
                 <div className="p-3 rounded-lg border border-transparent focus-within:border-accent focus-within:bg-accent/10 transition-all">
                   <label className="text-sm font-medium mb-2 block">
                     Header Value
                   </label>
-                  <input
-                    type="text"
+                  <VariableInput
                     value={auth.headerValue || ""}
-                    onChange={(e) =>
-                      onAuthChange({ ...auth, headerValue: e.target.value })
+                    environment={activeEnv}
+                    onChange={(val) =>
+                      onAuthChange({ ...auth, headerValue: val })
                     }
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="w-full"
                   />
                 </div>
               </>
