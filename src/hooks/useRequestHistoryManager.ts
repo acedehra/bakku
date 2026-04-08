@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { RequestHistoryItem, RequestData, ResponseData } from "../types";
-import { getBaseUrl, buildUrlWithParams } from "../utils/urlParser";
+import { RequestHistoryItem, ResponseData } from "../types";
+import { buildUrlWithParams } from "../utils/urlParser";
 
 interface UseRequestHistoryManagerResult {
     selectedHistoryId: string | null;

@@ -3,7 +3,7 @@ import { RequestData, HttpMethod, AuthType, Environment } from "../types";
 import { Trash2, FileText, List, Settings2, ShieldCheck, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VariableInput } from "./VariableInput";
-import { keyboardShortcuts, announceRequestSent, getMethodAriaLabel } from "../utils/accessibility";
+import { keyboardShortcuts, announceRequestSent } from "../utils/accessibility";
 
 interface RequestPaneProps {
   method: HttpMethod;

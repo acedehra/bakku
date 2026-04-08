@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
@@ -23,10 +23,12 @@ export default defineConfig({
         "**/*.d.ts",
         "src-tauri/",
       ],
-      statements: 80,
-      branches: 80,
-      functions: 80,
-      lines: 80,
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      }
     },
   },
   resolve: {
