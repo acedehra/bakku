@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ResponseData } from "../types";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface ResponsePaneProps {
   response: ResponseData | null;
@@ -91,9 +93,30 @@ export function ResponsePane({
         {!loading && !error && response && (
           <>
             {activeTab === "Pretty" && (
-              <pre className="text-xs whitespace-pre-wrap font-mono">
-                {response.body || "(empty response)"}
-              </pre>
+              <div className="text-xs font-mono">
+                {response.body ? (
+                  Object.entries(response.headers).some(
+                    ([key, value]) => key.toLowerCase() === "content-type" && String(value).includes("application/json")
+                  ) ? (
+                    <SyntaxHighlighter
+                      language="json"
+                      style={vscDarkPlus}
+                      customStyle={{
+                        margin: 0,
+                        background: "transparent",
+                        padding: 0,
+                      }}
+                      wrapLongLines={true}
+                    >
+                      {response.body}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <pre className="whitespace-pre-wrap">{response.body}</pre>
+                  )
+                ) : (
+                  <pre className="whitespace-pre-wrap text-muted-foreground">(empty response)</pre>
+                )}
+              </div>
             )}
             {activeTab === "Headers" && (
               <div className="space-y-2">
