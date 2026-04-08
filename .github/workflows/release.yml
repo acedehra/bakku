@@ -49,8 +49,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: ${{ github.event.inputs.version }}
-          releaseName: "kordix ${{ github.event.inputs.version }}"
-          releaseBody: "Manual release of kordix version ${{ github.event.inputs.version }}"
+          releaseName: "Bakku ${{ github.event.inputs.version }}"
+          releaseBody: "Manual release of Bakku version ${{ github.event.inputs.version }}"
           releaseDraft: false
           prerelease: false
           # Build universal binary for macOS
