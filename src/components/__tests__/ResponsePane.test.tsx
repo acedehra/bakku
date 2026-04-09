@@ -25,10 +25,10 @@ describe("ResponsePane Syntax Highlighting", () => {
     // In our implementation, standard text uses a <pre> with 'whitespace-pre-wrap'.
     // The SyntaxHighlighter will not have this specific class structure we defined for the fallback.
     const normalPre = document.querySelector('.whitespace-pre-wrap');
-    expect(normalPre).not.toBeInTheDocument();
+    expect(normalPre).toBeNull();
     
     // SyntaxHighlighter renders its own code tags. We check that the text still rendered.
-    expect(screen.getByText(/"test"/)).toBeInTheDocument();
+    expect(screen.getByText(/"test"/)).not.toBeNull();
   });
 
   it("uses standard pre for text/plain content type", () => {
@@ -41,8 +41,8 @@ describe("ResponsePane Syntax Highlighting", () => {
     );
     
     const normalPre = document.querySelector('.whitespace-pre-wrap');
-    expect(normalPre).toBeInTheDocument();
-    expect(normalPre).toHaveTextContent("Hello World");
+    expect(normalPre).not.toBeNull();
+    expect(normalPre?.textContent).toContain("Hello World");
   });
 
   it("uses standard pre for missing content type", () => {
@@ -55,7 +55,7 @@ describe("ResponsePane Syntax Highlighting", () => {
     );
     
     const normalPre = document.querySelector('.whitespace-pre-wrap');
-    expect(normalPre).toBeInTheDocument();
-    expect(normalPre).toHaveTextContent("Hello World");
+    expect(normalPre).not.toBeNull();
+    expect(normalPre?.textContent).toContain("Hello World");
   });
 });
