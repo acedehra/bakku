@@ -1,32 +1,152 @@
-import { useState, useEffect } from "react";
-import { SavedRequest, RequestFolder, HttpMethod, AuthConfig } from "../types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import * as savedLibrary from "../api/savedLibrary";
+import {
+  SavedRequest,
+  RequestFolder,
+  HttpMethod,
+  AuthConfig,
+  ResponseData,
+  RequestHistoryItem,
+} from "../types";
 import { SAVED_REQUESTS_STORAGE_KEY } from "../constants";
 import { HISTORY_STORAGE_KEY } from "../constants";
-import { RequestHistoryItem } from "../types";
+
+function buildHistoryMigrationPayload(): { folders: RequestFolder[]; requests: SavedRequest[] } | null {
+  try {
+    const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!storedHistory) return null;
+    const history = JSON.parse(storedHistory) as RequestHistoryItem[];
+    if (history.length === 0) return null;
+
+    const folder: RequestFolder = {
+      id: `folder-${Date.now()}`,
+      name: "Migrated History",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const requests: SavedRequest[] = history
+      .slice()
+      .reverse()
+      .map((item) => ({
+        id: `saved-${item.id}`,
+        name: `${item.method} ${new Date(item.timestamp).toLocaleString()}`,
+        method: item.method,
+        url: item.requestData.url,
+        headers: item.requestData.headers,
+        params: item.requestData.params,
+        body: item.requestData.body,
+        auth: item.requestData.auth,
+        folderId: folder.id,
+        createdAt: item.timestamp,
+        updatedAt: item.timestamp,
+      }));
+
+    return { folders: [folder], requests };
+  } catch {
+    return null;
+  }
+}
+
+async function tryMigrateLocalStorageToTauri(): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem(SAVED_REQUESTS_STORAGE_KEY);
+    if (stored) {
+      const data = JSON.parse(stored) as { requests: SavedRequest[]; folders: RequestFolder[] };
+      const folders = data.folders || [];
+      const requests = data.requests || [];
+      if (folders.length > 0 || requests.length > 0) {
+        await savedLibrary.importLibrary(folders, requests);
+        localStorage.removeItem(SAVED_REQUESTS_STORAGE_KEY);
+        return true;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to migrate saved requests from localStorage to SQLite", err);
+  }
+
+  const fromHistory = buildHistoryMigrationPayload();
+  if (fromHistory && (fromHistory.folders.length > 0 || fromHistory.requests.length > 0)) {
+    try {
+      await savedLibrary.importLibrary(fromHistory.folders, fromHistory.requests);
+      return true;
+    } catch (err) {
+      console.error("Failed to migrate history to SQLite", err);
+    }
+  }
+  return false;
+}
 
 export function useSavedRequests() {
+  const tauriMode = useMemo(() => isTauri(), []);
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
   const [folders, setFolders] = useState<RequestFolder[]>([]);
+  const [libraryReady, setLibraryReady] = useState(false);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SAVED_REQUESTS_STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored) as { requests: SavedRequest[]; folders: RequestFolder[] };
-        setSavedRequests(data.requests || []);
-        setFolders(data.folders || []);
-      } else {
-        // Migration: if no saved requests exist but history does, migrate it
-        migrateHistoryToSavedRequests();
-      }
-    } catch (err) {
-      console.error("Failed to load saved requests from localStorage", err);
-    }
+  const refreshFromDb = useCallback(async () => {
+    const lib = await savedLibrary.getLibrary();
+    setFolders(lib.folders);
+    setSavedRequests(lib.requests);
   }, []);
 
-  // Save to localStorage whenever data changes
   useEffect(() => {
+    let cancelled = false;
+
+    async function initTauri() {
+      try {
+        let lib = await savedLibrary.getLibrary();
+        if (lib.folders.length === 0 && lib.requests.length === 0) {
+          const migrated = await tryMigrateLocalStorageToTauri();
+          if (migrated) {
+            lib = await savedLibrary.getLibrary();
+          }
+        }
+        if (!cancelled) {
+          setFolders(lib.folders);
+          setSavedRequests(lib.requests);
+        }
+      } catch (err) {
+        console.error("Failed to load saved library from SQLite", err);
+      } finally {
+        if (!cancelled) setLibraryReady(true);
+      }
+    }
+
+    function initLocal() {
+      try {
+        const stored = localStorage.getItem(SAVED_REQUESTS_STORAGE_KEY);
+        if (stored) {
+          const data = JSON.parse(stored) as { requests: SavedRequest[]; folders: RequestFolder[] };
+          setSavedRequests(data.requests || []);
+          setFolders(data.folders || []);
+        } else {
+          const fromHistory = buildHistoryMigrationPayload();
+          if (fromHistory) {
+            setFolders(fromHistory.folders);
+            setSavedRequests(fromHistory.requests);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load saved requests from localStorage", err);
+      } finally {
+        setLibraryReady(true);
+      }
+    }
+
+    if (tauriMode) {
+      void initTauri();
+    } else {
+      initLocal();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tauriMode]);
+
+  useEffect(() => {
+    if (tauriMode) return;
     try {
       localStorage.setItem(
         SAVED_REQUESTS_STORAGE_KEY,
@@ -35,50 +155,12 @@ export function useSavedRequests() {
     } catch (err) {
       console.error("Failed to save saved requests to localStorage", err);
     }
-  }, [savedRequests, folders]);
+  }, [savedRequests, folders, tauriMode]);
 
-  const migrateHistoryToSavedRequests = () => {
-    try {
-      const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
-      if (storedHistory) {
-        const history = JSON.parse(storedHistory) as RequestHistoryItem[];
-        if (history.length > 0) {
-          // Create a "Migrated History" folder
-          const folder: RequestFolder = {
-            id: `folder-${Date.now()}`,
-            name: "Migrated History",
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          };
-
-          // Convert history items to saved requests
-          const requests: SavedRequest[] = history
-            .slice()
-            .reverse()
-            .map((item) => ({
-              id: `saved-${item.id}`,
-              name: `${item.method} ${new Date(item.timestamp).toLocaleString()}`,
-              method: item.method,
-              url: item.requestData.url,
-              headers: item.requestData.headers,
-              params: item.requestData.params,
-              body: item.requestData.body,
-              auth: item.requestData.auth,
-              folderId: folder.id,
-              createdAt: item.timestamp,
-              updatedAt: item.timestamp,
-            }));
-
-          setFolders([folder]);
-          setSavedRequests(requests);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to migrate history to saved requests", err);
-    }
-  };
-
-  const createRequest = (name: string, folderId: string | null = null): SavedRequest => {
+  const createRequest = async (
+    name: string,
+    folderId: string | null = null
+  ): Promise<SavedRequest> => {
     const newRequest: SavedRequest = {
       id: `saved-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       name,
@@ -92,52 +174,80 @@ export function useSavedRequests() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    setSavedRequests((prev) => [...prev, newRequest]);
+    if (tauriMode) {
+      await savedLibrary.createRequest(newRequest);
+      await refreshFromDb();
+    } else {
+      setSavedRequests((prev) => [...prev, newRequest]);
+    }
     return newRequest;
   };
 
-  const updateRequest = (updatedRequest: SavedRequest) => {
-    setSavedRequests((prev) =>
-      prev.map((req) => (req.id === updatedRequest.id ? { ...updatedRequest, updatedAt: Date.now() } : req))
-    );
+  const updateRequest = async (updatedRequest: SavedRequest): Promise<void> => {
+    const next: SavedRequest = { ...updatedRequest, updatedAt: Date.now() };
+    if (tauriMode) {
+      await savedLibrary.updateRequest(next);
+      await refreshFromDb();
+    } else {
+      setSavedRequests((prev) =>
+        prev.map((req) => (req.id === next.id ? next : req))
+      );
+    }
   };
 
-  const deleteRequest = (id: string) => {
-    setSavedRequests((prev) => prev.filter((req) => req.id !== id));
+  const deleteRequest = async (id: string): Promise<void> => {
+    if (tauriMode) {
+      await savedLibrary.deleteRequest(id);
+      await refreshFromDb();
+    } else {
+      setSavedRequests((prev) => prev.filter((req) => req.id !== id));
+    }
   };
 
-  const createFolder = (name: string): RequestFolder => {
+  const createFolder = async (name: string): Promise<RequestFolder> => {
     const newFolder: RequestFolder = {
       id: `folder-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       name,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    setFolders((prev) => [...prev, newFolder]);
+    if (tauriMode) {
+      await savedLibrary.createFolder(newFolder);
+      await refreshFromDb();
+    } else {
+      setFolders((prev) => [...prev, newFolder]);
+    }
     return newFolder;
   };
 
-  const updateFolder = (updatedFolder: RequestFolder) => {
-    setFolders((prev) =>
-      prev.map((folder) =>
-        folder.id === updatedFolder.id ? { ...updatedFolder, updatedAt: Date.now() } : folder
-      )
-    );
+  const updateFolder = async (updatedFolder: RequestFolder): Promise<void> => {
+    const next: RequestFolder = { ...updatedFolder, updatedAt: Date.now() };
+    if (tauriMode) {
+      await savedLibrary.updateFolder(next);
+      await refreshFromDb();
+    } else {
+      setFolders((prev) =>
+        prev.map((folder) => (folder.id === next.id ? next : folder))
+      );
+    }
   };
 
-  const deleteFolder = (id: string) => {
-    setFolders((prev) => prev.filter((folder) => folder.id !== id));
-    // Also remove or unassign all requests in this folder
-    setSavedRequests((prev) =>
-      prev.map((req) => (req.folderId === id ? { ...req, folderId: null } : req))
-    );
+  const deleteFolder = async (id: string): Promise<void> => {
+    if (tauriMode) {
+      await savedLibrary.deleteFolder(id);
+      await refreshFromDb();
+    } else {
+      setFolders((prev) => prev.filter((folder) => folder.id !== id));
+      setSavedRequests((prev) =>
+        prev.map((req) => (req.folderId === id ? { ...req, folderId: null } : req))
+      );
+    }
   };
 
-  const getRequestById = (id: string): SavedRequest | undefined => {
-    return savedRequests.find((req) => req.id === id);
-  };
+  const getRequestById = (id: string): SavedRequest | undefined =>
+    savedRequests.find((req) => req.id === id);
 
-  const autoSaveRequest = (
+  const autoSaveRequest = async (
     id: string,
     data: {
       method: HttpMethod;
@@ -146,21 +256,35 @@ export function useSavedRequests() {
       params: Record<string, string>;
       body: string;
       auth: AuthConfig;
-    }
-  ) => {
+    },
+    lastResponse?: ResponseData
+  ): Promise<void> => {
     const existingRequest = getRequestById(id);
-    if (existingRequest) {
-      updateRequest({
-        ...existingRequest,
-        ...data,
-        updatedAt: Date.now(),
-      });
+    if (!existingRequest) return;
+
+    const updated: SavedRequest = {
+      ...existingRequest,
+      ...data,
+      updatedAt: Date.now(),
+    };
+    if (lastResponse !== undefined) {
+      updated.lastResponse = lastResponse;
+    }
+
+    if (tauriMode) {
+      await savedLibrary.updateRequest(updated);
+      await refreshFromDb();
+    } else {
+      setSavedRequests((prev) =>
+        prev.map((req) => (req.id === id ? updated : req))
+      );
     }
   };
 
   return {
     savedRequests,
     folders,
+    libraryReady,
     createRequest,
     updateRequest,
     deleteRequest,

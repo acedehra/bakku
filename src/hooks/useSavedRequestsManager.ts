@@ -42,7 +42,7 @@ export function useSavedRequestsManager({
     setAuth(request.auth);
     setSelectedSavedRequestId(request.id);
 
-    clearResponse(null);
+    clearResponse(request.lastResponse ?? null);
     clearError(null);
   };
 

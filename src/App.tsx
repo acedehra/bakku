@@ -96,24 +96,24 @@ function App() {
     clearError,
   });
 
-  const handleCreateRequest = () => {
-    const newRequest = createRequest("New Request");
+  const handleCreateRequest = async () => {
+    const newRequest = await createRequest("New Request");
     handleSavedRequestSelect(newRequest);
   };
 
   const handleCreateFolder = () => {
     const name = prompt("Enter folder name:");
     if (name && name.trim()) {
-      createFolder(name.trim());
+      void createFolder(name.trim());
     }
   };
 
   const handleRenameFolder = (folder: RequestFolder, newName: string) => {
-    updateFolder({ ...folder, name: newName });
+    void updateFolder({ ...folder, name: newName });
   };
 
   const handleRenameRequest = (request: SavedRequest, newName: string) => {
-    updateRequest({ ...request, name: newName });
+    void updateRequest({ ...request, name: newName });
   };
 
   const handleToggleFolder = (folderId: string) => {
@@ -129,19 +129,33 @@ function App() {
   };
 
   async function sendRequest() {
-    await executeRequest(method, url, headers, body, auth, activeEnv);
+    const responseData = await executeRequest(method, url, headers, body, auth, activeEnv);
 
-    // Auto-save to selected request on Send
     if (selectedSavedRequestId) {
       const baseUrl = getBaseUrl(url);
-      autoSaveRequest(selectedSavedRequestId, {
-        method,
-        url: baseUrl,
-        headers,
-        params,
-        body,
-        auth,
-      });
+      if (responseData) {
+        await autoSaveRequest(
+          selectedSavedRequestId,
+          {
+            method,
+            url: baseUrl,
+            headers,
+            params,
+            body,
+            auth,
+          },
+          responseData
+        );
+      } else {
+        await autoSaveRequest(selectedSavedRequestId, {
+          method,
+          url: baseUrl,
+          headers,
+          params,
+          body,
+          auth,
+        });
+      }
     }
   }
 
@@ -157,8 +171,12 @@ function App() {
           onSelectRequest={handleSavedRequestSelect}
           onCreateRequest={handleCreateRequest}
           onCreateFolder={handleCreateFolder}
-          onDeleteRequest={deleteRequest}
-          onDeleteFolder={deleteFolder}
+          onDeleteRequest={(id) => {
+            void deleteRequest(id);
+          }}
+          onDeleteFolder={(id) => {
+            void deleteFolder(id);
+          }}
           onToggleFolder={handleToggleFolder}
           onSearchChange={setSearchQuery}
           onRenameFolder={handleRenameFolder}

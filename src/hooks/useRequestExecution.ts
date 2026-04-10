@@ -13,9 +13,9 @@ interface UseRequestExecutionResult {
         body: string,
         auth: AuthConfig,
         activeEnv: Environment | null
-    ) => Promise<void>;
+    ) => Promise<ResponseData | null>;
     clearError: () => void;
-    clearResponse: () => void;
+    clearResponse: (response?: ResponseData | null) => void;
 }
 
 export function useRequestExecution(): UseRequestExecutionResult {
@@ -30,7 +30,7 @@ export function useRequestExecution(): UseRequestExecutionResult {
         body: string,
         auth: AuthConfig,
         activeEnv: Environment | null
-    ): Promise<void> => {
+    ): Promise<ResponseData | null> => {
         setLoading(true);
         setError(null);
         setResponse(null);
@@ -45,9 +45,11 @@ export function useRequestExecution(): UseRequestExecutionResult {
                 activeEnv
             );
             setResponse(responseData);
+            return responseData;
         } catch (err) {
             const errorMessage = formatError(err);
             setError(errorMessage);
+            return null;
         } finally {
             setLoading(false);
         }
@@ -57,8 +59,8 @@ export function useRequestExecution(): UseRequestExecutionResult {
         setError(error);
     };
 
-    const clearResponse = (response: ResponseData | null = null): void => {
-        setResponse(response);
+    const clearResponse = (next: ResponseData | null = null): void => {
+        setResponse(next);
     };
 
     return {

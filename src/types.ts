@@ -65,6 +65,8 @@ export interface SavedRequest {
   folderId: string | null;
   createdAt: number;
   updatedAt: number;
+  /** Last successful HTTP response when this saved request was sent (from SQLite). */
+  lastResponse?: ResponseData | null;
 }
 
 export interface RequestFolder {
