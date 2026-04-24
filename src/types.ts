@@ -11,11 +11,17 @@ export interface AuthConfig {
   headerValue?: string;
 }
 
+export interface KVEntry {
+  id: string;         // stable key for React lists; uuid-ish
+  key: string;
+  value: string;
+  enabled: boolean;
+}
+
 export interface RequestData {
   method: HttpMethod;
-  url: string;
-  headers: Record<string, string>;
-  params: Record<string, string>;
+  url: string;                  // source of truth for query string
+  headers: KVEntry[];                // ordered, may repeat keys
   body: string;
   auth: AuthConfig;
 }
@@ -58,8 +64,7 @@ export interface SavedRequest {
   name: string;
   method: HttpMethod;
   url: string;
-  headers: Record<string, string>;
-  params: Record<string, string>;
+  headers: KVEntry[];
   body: string;
   auth: AuthConfig;
   folderId: string | null;

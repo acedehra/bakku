@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { SavedRequest, ResponseData } from "../types";
-import { buildUrlWithParams } from "../utils/urlParser";
+import { SavedRequest, ResponseData, KVEntry, HttpMethod, AuthConfig } from "../types";
 
 interface UseSavedRequestsManagerResult {
   selectedSavedRequestId: string | null;
@@ -9,18 +8,18 @@ interface UseSavedRequestsManagerResult {
 }
 
 interface UseSavedRequestsManagerProps {
-  setMethod: (method: any) => void;
-  updateFromHistory: (url: string, params: any) => void;
-  setHeaders: (headers: Record<string, string>) => void;
+  setMethod: (method: HttpMethod) => void;
+  setUrl: (url: string) => void;
+  setHeaders: (headers: KVEntry[]) => void;
   setBody: (body: string) => void;
-  setAuth: (auth: any) => void;
+  setAuth: (auth: AuthConfig) => void;
   clearResponse: (response: ResponseData | null) => void;
   clearError: (error: string | null) => void;
 }
 
 export function useSavedRequestsManager({
   setMethod,
-  updateFromHistory,
+  setUrl,
   setHeaders,
   setBody,
   setAuth,
@@ -31,12 +30,7 @@ export function useSavedRequestsManager({
 
   const handleSavedRequestSelect = (request: SavedRequest): void => {
     setMethod(request.method);
-
-    // Build full URL with params when loading from saved request
-    const fullUrl = buildUrlWithParams(request.url, request.params);
-
-    updateFromHistory(fullUrl, request.params);
-
+    setUrl(request.url);
     setHeaders(request.headers);
     setBody(request.body);
     setAuth(request.auth);

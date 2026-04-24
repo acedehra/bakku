@@ -35,7 +35,6 @@ function buildHistoryMigrationPayload(): { folders: RequestFolder[]; requests: S
         method: item.method,
         url: item.requestData.url,
         headers: item.requestData.headers,
-        params: item.requestData.params,
         body: item.requestData.body,
         auth: item.requestData.auth,
         folderId: folder.id,
@@ -166,8 +165,7 @@ export function useSavedRequests() {
       name,
       method: "GET",
       url: "",
-      headers: {},
-      params: {},
+      headers: [],
       body: "",
       auth: { type: "None" },
       folderId,
@@ -252,8 +250,7 @@ export function useSavedRequests() {
     data: {
       method: HttpMethod;
       url: string;
-      headers: Record<string, string>;
-      params: Record<string, string>;
+      headers: KVEntry[];
       body: string;
       auth: AuthConfig;
     },

@@ -11,6 +11,15 @@ pub struct LibrarySnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct KVEntry {
+    pub id: String,
+    pub key: String,
+    pub value: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestFolder {
     pub id: String,
     pub name: String,
@@ -53,8 +62,7 @@ pub struct SavedRequest {
     pub name: String,
     pub method: String,
     pub url: String,
-    pub headers: HashMap<String, String>,
-    pub params: HashMap<String, String>,
+    pub headers: Vec<KVEntry>,
     pub body: String,
     pub auth: AuthConfig,
     #[serde(default)]
@@ -89,6 +97,19 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             updated_at INTEGER NOT NULL
          );",
     )?;
+
+    // Migration to schema v2: headers_json as array, drop params_json
+    // Check if we need to migrate
+    let table_info: Vec<String> = conn
+        .prepare("PRAGMA table_info(saved_requests)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if table_info.contains(&"params_json".to_string()) {
+        // We still have params_json, which means we are in v1 or transitioning
+        // For now, we'll keep the column but the Rust code will handle the transition
+    }
+
     Ok(())
 }
 
@@ -104,14 +125,26 @@ fn row_to_folder(row: &rusqlite::Row<'_>) -> rusqlite::Result<RequestFolder> {
 // Columns: id, folder_id, name, method, url, headers_json, params_json, body, auth_json, last_response_json, created_at, updated_at
 fn row_to_saved_request(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedRequest> {
     let headers_json: String = row.get(5)?;
-    let params_json: String = row.get(6)?;
     let auth_json: String = row.get(8)?;
     let last_response_json: Option<String> = row.get(9)?;
 
-    let headers: HashMap<String, String> = serde_json::from_str(&headers_json)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-    let params: HashMap<String, String> = serde_json::from_str(&params_json)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+    let headers: Vec<KVEntry> = match serde_json::from_str(&headers_json) {
+        Ok(v) => v,
+        Err(_) => {
+            // Old format: HashMap<String, String>
+            let map: HashMap<String, String> = serde_json::from_str(&headers_json)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+            map.into_iter()
+                .map(|(k, v)| KVEntry {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    key: k,
+                    value: v,
+                    enabled: true,
+                })
+                .collect()
+        }
+    };
+
     let auth: AuthConfig = serde_json::from_str(&auth_json)
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     let last_response = match last_response_json {
@@ -128,7 +161,6 @@ fn row_to_saved_request(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedReques
         method: row.get(3)?,
         url: row.get(4)?,
         headers,
-        params,
         body: row.get(7)?,
         auth,
         created_at: row.get(10)?,
@@ -184,10 +216,8 @@ pub fn delete_folder(conn: &Connection, id: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn request_to_params(req: &SavedRequest) -> rusqlite::Result<(String, String, String, Option<String>)> {
+fn request_to_params(req: &SavedRequest) -> rusqlite::Result<(String, String, Option<String>)> {
     let headers_json = serde_json::to_string(&req.headers)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-    let params_json = serde_json::to_string(&req.params)
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     let auth_json = serde_json::to_string(&req.auth)
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
@@ -197,11 +227,11 @@ fn request_to_params(req: &SavedRequest) -> rusqlite::Result<(String, String, St
         })?),
         None => None,
     };
-    Ok((headers_json, params_json, auth_json, last_response_json))
+    Ok((headers_json, auth_json, last_response_json))
 }
 
 pub fn insert_request(conn: &Connection, req: &SavedRequest) -> rusqlite::Result<()> {
-    let (headers_json, params_json, auth_json, last_response_json) = request_to_params(req)?;
+    let (headers_json, auth_json, last_response_json) = request_to_params(req)?;
     conn.execute(
         "INSERT INTO saved_requests (
             id, folder_id, name, method, url, headers_json, params_json, body, auth_json, last_response_json, created_at, updated_at
@@ -213,7 +243,7 @@ pub fn insert_request(conn: &Connection, req: &SavedRequest) -> rusqlite::Result
             req.method,
             req.url,
             headers_json,
-            params_json,
+            "[]", // params_json is now always empty
             req.body,
             auth_json,
             last_response_json,
@@ -225,7 +255,7 @@ pub fn insert_request(conn: &Connection, req: &SavedRequest) -> rusqlite::Result
 }
 
 pub fn update_request(conn: &Connection, req: &SavedRequest) -> rusqlite::Result<()> {
-    let (headers_json, params_json, auth_json, last_response_json) = request_to_params(req)?;
+    let (headers_json, auth_json, last_response_json) = request_to_params(req)?;
     conn.execute(
         "UPDATE saved_requests SET
             folder_id = ?2, name = ?3, method = ?4, url = ?5,
@@ -239,7 +269,7 @@ pub fn update_request(conn: &Connection, req: &SavedRequest) -> rusqlite::Result
             req.method,
             req.url,
             headers_json,
-            params_json,
+            "[]", // params_json is now always empty
             req.body,
             auth_json,
             last_response_json,

@@ -1,5 +1,5 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import { AuthConfig, HttpMethod, ResponseData, Environment } from "../types";
+import { AuthConfig, HttpMethod, ResponseData, Environment, KVEntry } from "../types";
 import { createLogger } from "./logger";
 import { getCachedRequest, cacheRequest } from "./requestCache";
 import { trackRequest, completeRequest } from "./performance";
@@ -121,16 +121,16 @@ export const substituteVariables = (
     return result;
 };
 
-export const buildAuthHeaders = (authConfig: AuthConfig, activeEnv: Environment | null = null): Record<string, string> => {
-    const authHeaders: Record<string, string> = {};
+export const buildAuthHeaders = (authConfig: AuthConfig, activeEnv: Environment | null = null): [string, string][] => {
+    const authHeaders: [string, string][] = [];
     if (authConfig.type === "Basic" && authConfig.username && authConfig.password) {
         const substitutedUsername = substituteVariables(authConfig.username, activeEnv);
         const substitutedPassword = substituteVariables(authConfig.password, activeEnv);
         const credentials = btoa(`${encodeURIComponent(substitutedUsername)}:${encodeURIComponent(substitutedPassword)}`);
-        authHeaders["Authorization"] = `Basic ${credentials}`;
+        authHeaders.push(["Authorization", `Basic ${credentials}`]);
     } else if (authConfig.type === "Bearer" && authConfig.token) {
         const substitutedToken = substituteVariables(authConfig.token, activeEnv);
-        authHeaders["Authorization"] = `Bearer ${substitutedToken}`;
+        authHeaders.push(["Authorization", `Bearer ${substitutedToken}`]);
     } else if (
         authConfig.type === "Custom" &&
         authConfig.headerName &&
@@ -138,7 +138,7 @@ export const buildAuthHeaders = (authConfig: AuthConfig, activeEnv: Environment 
     ) {
         const substitutedHeaderName = substituteVariables(authConfig.headerName, activeEnv);
         const substitutedHeaderValue = substituteVariables(authConfig.headerValue, activeEnv);
-        authHeaders[substitutedHeaderName] = substitutedHeaderValue;
+        authHeaders.push([substitutedHeaderName, substitutedHeaderValue]);
     }
     return authHeaders;
 };
@@ -146,7 +146,7 @@ export const buildAuthHeaders = (authConfig: AuthConfig, activeEnv: Environment 
 export async function executeHttpRequest(
     method: HttpMethod,
     url: string,
-    headers: Record<string, string>,
+    headers: KVEntry[],
     body: string,
     auth: AuthConfig,
     activeEnv: Environment | null = null
@@ -166,22 +166,22 @@ export async function executeHttpRequest(
         throw new Error("Invalid URL format. Please enter a valid URL (e.g., https://example.com)");
     }
 
-    const substitutedHeaders: Record<string, string> = {};
-    Object.entries(headers).forEach(([key, value]) => {
-        substitutedHeaders[substituteVariables(key, activeEnv)] = substituteVariables(value, activeEnv);
-    });
+    const finalHeaders: [string, string][] = [];
+    for (const h of headers) {
+        if (!h.enabled || !h.key) continue;
+        finalHeaders.push([substituteVariables(h.key, activeEnv), substituteVariables(h.value, activeEnv)]);
+    }
 
     const authHeaders = buildAuthHeaders(auth, activeEnv);
-
-    const allHeaders = { ...substitutedHeaders, ...authHeaders };
+    const allHeaders = [...finalHeaders, ...authHeaders];
 
     const options: {
         method: string;
-        headers?: Record<string, string>;
+        headers?: [string, string][];
         body?: string;
     } = { method };
 
-    if (Object.keys(allHeaders).length > 0) {
+    if (allHeaders.length > 0) {
         options.headers = allHeaders;
     }
 
@@ -189,10 +189,10 @@ export async function executeHttpRequest(
     if (canHaveBody && substitutedBody.trim()) {
         options.body = substitutedBody;
         if (!options.headers) {
-            options.headers = {};
+            options.headers = [];
         }
-        if (!options.headers["Content-Type"]) {
-            options.headers["Content-Type"] = "application/json";
+        if (!options.headers.some(([k]) => k.toLowerCase() === "content-type")) {
+            options.headers.push(["Content-Type", "application/json"]);
         }
     }
 

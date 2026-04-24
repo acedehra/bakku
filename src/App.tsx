@@ -9,10 +9,11 @@ import {
   SavedRequest,
   RequestFolder,
   AuthConfig,
+  KVEntry,
 } from "./types";
 import { usePanelResize } from "./hooks/usePanelResize";
 import { useSavedRequests } from "./hooks/useSavedRequests";
-import { useUrlParams } from "./hooks/useUrlParams";
+import { useUrl } from "./hooks/useUrlParams";
 import { useRequestExecution } from "./hooks/useRequestExecution";
 import { useSavedRequestsManager } from "./hooks/useSavedRequestsManager";
 import { getBaseUrl } from "./utils/urlParser";
@@ -50,10 +51,9 @@ function App() {
   const {
     url,
     setUrl,
-    params,
-    setParams,
-    updateFromHistory,
-  } = useUrlParams("https://jsonplaceholder.typicode.com/todos/1");
+    paramEntries,
+    setParamEntries,
+  } = useUrl("https://jsonplaceholder.typicode.com/todos/1");
 
   const {
     environments,
@@ -70,7 +70,7 @@ function App() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
   const [method, setMethod] = useState<HttpMethod>("GET");
-  const [headers, setHeaders] = useState<Record<string, string>>({});
+  const [headers, setHeaders] = useState<KVEntry[]>([]);
   const [body, setBody] = useState("");
   const [auth, setAuth] = useState<AuthConfig>({ type: "None" });
 
@@ -88,7 +88,7 @@ function App() {
     handleSavedRequestSelect,
   } = useSavedRequestsManager({
     setMethod,
-    updateFromHistory,
+    setUrl,
     setHeaders,
     setBody,
     setAuth,
@@ -132,15 +132,13 @@ function App() {
     const responseData = await executeRequest(method, url, headers, body, auth, activeEnv);
 
     if (selectedSavedRequestId) {
-      const baseUrl = getBaseUrl(url);
       if (responseData) {
         await autoSaveRequest(
           selectedSavedRequestId,
           {
             method,
-            url: baseUrl,
+            url,
             headers,
-            params,
             body,
             auth,
           },
@@ -149,9 +147,8 @@ function App() {
       } else {
         await autoSaveRequest(selectedSavedRequestId, {
           method,
-          url: baseUrl,
+          url,
           headers,
-          params,
           body,
           auth,
         });
@@ -188,13 +185,13 @@ function App() {
         method={method}
         url={url}
         headers={headers}
-        params={params}
+        paramEntries={paramEntries}
         body={body}
         auth={auth}
         onMethodChange={setMethod}
         onUrlChange={setUrl}
         onHeadersChange={setHeaders}
-        onParamsChange={setParams}
+        onParamEntriesChange={setParamEntries}
         onBodyChange={setBody}
         onAuthChange={setAuth}
         onSend={sendRequest}

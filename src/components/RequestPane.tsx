@@ -1,23 +1,25 @@
-import { useState, useRef, useEffect } from "react";
-import { RequestData, HttpMethod, AuthType, Environment } from "../types";
+import { useState, useEffect } from "react";
+import { HttpMethod, AuthType, Environment, KVEntry, AuthConfig } from "../types";
 import { Trash2, FileText, List, Settings2, ShieldCheck, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VariableInput } from "./VariableInput";
 import { keyboardShortcuts, announceRequestSent } from "../utils/accessibility";
+import { ParamsTab } from "./ParamsTab";
+import { HeadersTab } from "./HeadersTab";
 
 interface RequestPaneProps {
   method: HttpMethod;
   url: string;
-  headers: Record<string, string>;
-  params: Record<string, string>;
+  headers: KVEntry[];
+  paramEntries: KVEntry[];
   body: string;
-  auth: RequestData["auth"];
+  auth: AuthConfig;
   onMethodChange: (method: HttpMethod) => void;
   onUrlChange: (url: string) => void;
-  onHeadersChange: (headers: Record<string, string>) => void;
-  onParamsChange: (params: Record<string, string>) => void;
+  onHeadersChange: (headers: KVEntry[]) => void;
+  onParamEntriesChange: (params: KVEntry[]) => void;
   onBodyChange: (body: string) => void;
-  onAuthChange: (auth: RequestData["auth"]) => void;
+  onAuthChange: (auth: AuthConfig) => void;
   onSend: () => void;
   loading: boolean;
   environments: Environment[];
@@ -32,13 +34,13 @@ export function RequestPane({
   method,
   url,
   headers,
-  params,
+  paramEntries,
   body,
   auth,
   onMethodChange,
   onUrlChange,
   onHeadersChange,
-  onParamsChange,
+  onParamEntriesChange,
   onBodyChange,
   onAuthChange,
   onSend,
@@ -49,14 +51,6 @@ export function RequestPane({
   onOpenEnvManager,
 }: RequestPaneProps) {
   const [activeTab, setActiveTab] = useState<RequestTab>("Body");
-  const paramKeyInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
-  const headerKeyInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
-  const [focusedParamIndex, setFocusedParamIndex] = useState<number | null>(null);
-  const [focusedHeaderIndex, setFocusedHeaderIndex] = useState<number | null>(null);
-  const [paramCursorPos, setParamCursorPos] = useState<number | null>(null);
-  const [headerCursorPos, setHeaderCursorPos] = useState<number | null>(null);
-  const [justAddedParam, setJustAddedParam] = useState(false);
-  const [justAddedHeader, setJustAddedHeader] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
@@ -79,102 +73,7 @@ export function RequestPane({
   };
 
   const activeEnv = environments.find(e => e.id === activeEnvId) || null;
-
   const canHaveBody = method !== "GET" && method !== "HEAD";
-
-  // Restore focus for params after state update
-  useEffect(() => {
-    if (focusedParamIndex !== null) {
-      const input = paramKeyInputRefs.current.get(focusedParamIndex);
-      if (input) {
-        input.focus();
-        if (paramCursorPos !== null) {
-          input.setSelectionRange(paramCursorPos, paramCursorPos);
-        }
-        setFocusedParamIndex(null);
-        setParamCursorPos(null);
-      }
-    } else if (justAddedParam) {
-      // Focus the first empty key input after adding a new param
-      const entries = Object.entries(params);
-      const emptyKeyIndex = entries.findIndex(([key]) => key === "");
-      if (emptyKeyIndex !== -1) {
-        const input = paramKeyInputRefs.current.get(emptyKeyIndex);
-        if (input) {
-          input.focus();
-        }
-      }
-      setJustAddedParam(false);
-    }
-  }, [params, focusedParamIndex, paramCursorPos, justAddedParam]);
-
-  // Restore focus for headers after state update
-  useEffect(() => {
-    if (focusedHeaderIndex !== null) {
-      const input = headerKeyInputRefs.current.get(focusedHeaderIndex);
-      if (input) {
-        input.focus();
-        if (headerCursorPos !== null) {
-          input.setSelectionRange(headerCursorPos, headerCursorPos);
-        }
-        setFocusedHeaderIndex(null);
-        setHeaderCursorPos(null);
-      }
-    } else if (justAddedHeader) {
-      // Focus the first empty key input after adding a new header
-      const entries = Object.entries(headers);
-      const emptyKeyIndex = entries.findIndex(([key]) => key === "");
-      if (emptyKeyIndex !== -1) {
-        const input = headerKeyInputRefs.current.get(emptyKeyIndex);
-        if (input) {
-          input.focus();
-        }
-      }
-      setJustAddedHeader(false);
-    }
-  }, [headers, focusedHeaderIndex, headerCursorPos, justAddedHeader]);
-
-  const updateHeader = (key: string, value: string) => {
-    const newHeaders = { ...headers };
-    if (value.trim() === "") {
-      delete newHeaders[key];
-    } else {
-      newHeaders[key] = value;
-    }
-    onHeadersChange(newHeaders);
-  };
-
-  const addHeader = () => {
-    setJustAddedHeader(true);
-    onHeadersChange({ ...headers, "": "" });
-  };
-
-  const deleteHeader = (key: string) => {
-    const newHeaders = { ...headers };
-    delete newHeaders[key];
-    onHeadersChange(newHeaders);
-  };
-
-  const updateParam = (key: string, value: string) => {
-    const newParams = { ...params };
-    if (value.trim() === "") {
-      delete newParams[key];
-    } else {
-      newParams[key] = value;
-    }
-    onParamsChange(newParams);
-  };
-
-  const addParam = () => {
-    setJustAddedParam(true);
-    onParamsChange({ ...params, "": "" });
-  };
-
-  const deleteParam = (key: string) => {
-    const newParams = { ...params };
-    delete newParams[key];
-    onParamsChange(newParams);
-  };
 
   const tabs: RequestTab[] = ["Body", "Params", "Headers", "Auth"];
 
@@ -185,8 +84,8 @@ export function RequestPane({
     Auth: <ShieldCheck size={14} />,
   };
 
-  const paramCount = Object.keys(params).filter(k => k.trim() !== "").length;
-  const headerCount = Object.keys(headers).filter(k => k.trim() !== "").length;
+  const paramCount = paramEntries.filter(e => e.key.trim() !== "" && e.enabled).length;
+  const headerCount = headers.filter(h => h.key.trim() !== "" && h.enabled).length;
 
   return (
     <div className="flex-1 h-screen flex flex-col bg-background">
@@ -312,101 +211,18 @@ export function RequestPane({
           </div>
         )}
         {activeTab === "Params" && (
-          <div className="space-y-2">
-            {Object.entries(params).map(([key, value], index) => (
-              <div key={`param-${index}-${key}`} className="flex gap-2 items-center group p-1.5 rounded-md hover:bg-accent/30 focus-within:bg-accent/40 transition-colors">
-                <VariableInput
-                  ref={(el) => {
-                    if (el) {
-                      paramKeyInputRefs.current.set(index, el as HTMLInputElement);
-                    }
-                  }}
-                  placeholder="Key"
-                  value={key}
-                  environment={activeEnv}
-                  onChange={(val) => {
-                    const input = paramKeyInputRefs.current.get(index);
-                    const cursorPos = input?.selectionStart ?? null;
-                    const newParams = { ...params };
-                    delete newParams[key];
-                    newParams[val] = value;
-                    onParamsChange(newParams);
-                    // Update cursor status tracking
-                    setFocusedParamIndex(index);
-                    setParamCursorPos(cursorPos);
-                  }}
-                  className="flex-1"
-                />
-                <VariableInput
-                  placeholder="Value"
-                  value={value}
-                  environment={activeEnv}
-                  onChange={(val) => updateParam(key, val)}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={() => deleteParam(key)}
-                  variant="outline" size="icon" aria-label="Delete param" title="Delete param">
-                  <Trash2 />
-                </Button>
-              </div>
-            ))}
-            <button
-              onClick={addParam}
-              className="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
-            >
-              + Add Param
-            </button>
-          </div>
+          <ParamsTab
+            paramEntries={paramEntries}
+            onParamEntriesChange={onParamEntriesChange}
+            activeEnv={activeEnv}
+          />
         )}
         {activeTab === "Headers" && (
-          <div className="space-y-2">
-            {Object.entries(headers).map(([key, value], index) => (
-              <div key={`header-${index}-${key}`} className="flex gap-2 items-center group p-1.5 rounded-md hover:bg-accent/30 focus-within:bg-accent/40 transition-colors">
-                <VariableInput
-                  ref={(el) => {
-                    if (el) {
-                      headerKeyInputRefs.current.set(index, el as HTMLInputElement);
-                    }
-                  }}
-                  placeholder="Header name"
-                  value={key}
-                  environment={activeEnv}
-                  onChange={(val) => {
-                    const input = headerKeyInputRefs.current.get(index);
-                    const cursorPos = input?.selectionStart ?? null;
-                    const newHeaders = { ...headers };
-                    delete newHeaders[key];
-                    newHeaders[val] = value;
-                    onHeadersChange(newHeaders);
-                    setFocusedHeaderIndex(index);
-                    setHeaderCursorPos(cursorPos);
-                  }}
-                  className="flex-1"
-                />
-                <VariableInput
-                  placeholder="Header value"
-                  value={value}
-                  environment={activeEnv}
-                  onChange={(val) => updateHeader(key, val)}
-                  className="flex-1"
-                />
-
-                <Button
-                  onClick={() => deleteHeader(key)}
-                  variant="outline" size="icon" aria-label="Delete header" title="Delete header">
-
-                  <Trash2 />
-                </Button>
-              </div>
-            ))}
-            <button
-              onClick={addHeader}
-              className="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
-            >
-              + Add Header
-            </button>
-          </div>
+          <HeadersTab
+            headers={headers}
+            onHeadersChange={onHeadersChange}
+            activeEnv={activeEnv}
+          />
         )}
         {activeTab === "Auth" && (
           <div className="space-y-4">

@@ -126,6 +126,13 @@ function validateImportData(data: unknown): ValidationResult {
                     if (!itemObj.url || typeof itemObj.url !== "string") {
                         errors.push(`History item at index ${index} missing url`);
                     }
+                    // Validate headers/params - can be Record or Array during transition
+                    const rd = itemObj.requestData as Record<string, unknown>;
+                    if (rd) {
+                        if (rd.headers && typeof rd.headers !== "object") {
+                            errors.push(`History item at index ${index} has invalid headers`);
+                        }
+                    }
                 }
             });
         }

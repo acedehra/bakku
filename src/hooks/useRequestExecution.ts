@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HttpMethod, ResponseData, AuthConfig, Environment } from "../types";
+import { HttpMethod, ResponseData, AuthConfig, Environment, KVEntry } from "../types";
 import { executeHttpRequest, formatError } from "../utils/httpClient";
 
 interface UseRequestExecutionResult {
@@ -9,7 +9,7 @@ interface UseRequestExecutionResult {
     executeRequest: (
         method: HttpMethod,
         url: string,
-        headers: Record<string, string>,
+        headers: KVEntry[],
         body: string,
         auth: AuthConfig,
         activeEnv: Environment | null
@@ -26,7 +26,7 @@ export function useRequestExecution(): UseRequestExecutionResult {
     const executeRequest = async (
         method: HttpMethod,
         url: string,
-        headers: Record<string, string>,
+        headers: KVEntry[],
         body: string,
         auth: AuthConfig,
         activeEnv: Environment | null

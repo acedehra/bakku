@@ -1,8 +1,7 @@
+import { KVEntry } from "../types";
+
 /**
- * Input Validation Utilities
- *
- * Provides validation functions for user inputs throughout the application.
- */
+ * Validation result interface
 
 /**
  * Validation result interface
@@ -118,21 +117,21 @@ export function validateHeaderValue(value: string): ValidationResult {
  * Validate all headers
  */
 export function validateHeaders(
-    headers: Record<string, string>
+    headers: KVEntry[]
 ): ValidationResult {
     const errors: string[] = [];
 
-    for (const [name, value] of Object.entries(headers)) {
-        if (!name) continue; // Skip empty keys
+    for (const header of headers) {
+        if (!header.enabled || !header.key) continue;
 
-        const nameResult = validateHeaderName(name);
+        const nameResult = validateHeaderName(header.key);
         if (!nameResult.isValid) {
-            errors.push(`Header "${name}": ${nameResult.error}`);
+            errors.push(`Header "${header.key}": ${nameResult.error}`);
         }
 
-        const valueResult = validateHeaderValue(value);
+        const valueResult = validateHeaderValue(header.value);
         if (!valueResult.isValid) {
-            errors.push(`Header "${name}" value: ${valueResult.error}`);
+            errors.push(`Header "${header.key}" value: ${valueResult.error}`);
         }
     }
 
@@ -328,21 +327,21 @@ export function validateParamValue(value: string): ValidationResult {
  * Validate all URL parameters
  */
 export function validateParams(
-    params: Record<string, string>
+    params: KVEntry[]
 ): ValidationResult {
     const errors: string[] = [];
 
-    for (const [key, value] of Object.entries(params)) {
-        if (!key) continue; // Skip empty keys
+    for (const entry of params) {
+        if (!entry.enabled || !entry.key) continue;
 
-        const keyResult = validateParamKey(key);
+        const keyResult = validateParamKey(entry.key);
         if (!keyResult.isValid) {
-            errors.push(`Parameter "${key}": ${keyResult.error}`);
+            errors.push(`Parameter "${entry.key}": ${keyResult.error}`);
         }
 
-        const valueResult = validateParamValue(value);
+        const valueResult = validateParamValue(entry.value);
         if (!valueResult.isValid) {
-            errors.push(`Parameter "${key}" value: ${valueResult.error}`);
+            errors.push(`Parameter "${entry.key}" value: ${valueResult.error}`);
         }
     }
 

@@ -1,3 +1,5 @@
+import { KVEntry } from '../types';
+
 // Check if URL has a protocol
 export const hasProtocol = (url: string): boolean => {
     return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url);
@@ -137,4 +139,61 @@ export const buildUrlWithParams = (baseUrl: string, queryParams: Record<string, 
     }
 
     return `${baseWithoutQuery}?${queryPairs.join('&')}${hash}`;
+};
+
+/**
+ * Parse query params from URL preserving order and allowing duplicates.
+ */
+export const parseUrlParamsOrdered = (fullUrl: string): KVEntry[] => {
+    if (!fullUrl.trim()) return [];
+
+    const queryIndex = fullUrl.indexOf('?');
+    const queryString = queryIndex !== -1 ? fullUrl.substring(queryIndex + 1) : '';
+    // Strip hash if present in queryString
+    const hashInQuery = queryString.indexOf('#');
+    const cleanQuery = hashInQuery !== -1 ? queryString.substring(0, hashInQuery) : queryString;
+    
+    const searchParams = new URLSearchParams(cleanQuery);
+
+    const entries: KVEntry[] = [];
+    searchParams.forEach((value, key) => {
+        entries.push({
+            id: crypto.randomUUID(),
+            key,
+            value,
+            enabled: true
+        });
+    });
+
+    return entries;
+};
+
+/**
+ * Build full URL with ordered params, preserving duplicates and respecting the 'enabled' flag.
+ */
+export const buildUrlWithOrderedParams = (baseUrl: string, entries: KVEntry[]): string => {
+    if (!baseUrl.trim()) return baseUrl;
+
+    const searchParams = new URLSearchParams();
+    entries.forEach(entry => {
+        if (entry.enabled && entry.key) {
+            searchParams.append(entry.key, entry.value || '');
+        }
+    });
+
+    const queryString = searchParams.toString();
+    
+    const hashIndex = baseUrl.indexOf('#');
+    let baseWithoutHash = baseUrl;
+    let hash = '';
+    
+    if (hashIndex !== -1) {
+        hash = baseUrl.substring(hashIndex);
+        baseWithoutHash = baseUrl.substring(0, hashIndex);
+    }
+
+    const baseWithoutQuery = getBaseUrl(baseWithoutHash);
+    
+    if (!queryString) return `${baseWithoutQuery}${hash}`;
+    return `${baseWithoutQuery}?${queryString}${hash}`;
 };
