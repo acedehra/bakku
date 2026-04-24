@@ -26,7 +26,8 @@ export const VariableInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, 
         const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
         const highlightRef = useRef<HTMLDivElement>(null);
 
-        useImperativeHandle(ref, () => inputRef.current as any);
+        // Properly type the ref to return either HTMLInputElement or HTMLTextAreaElement
+        useImperativeHandle(ref, () => inputRef.current!, []);
 
         const syncScroll = () => {
             if (inputRef.current && highlightRef.current) {
@@ -106,7 +107,7 @@ export const VariableInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, 
                 {/* Input Layer */}
                 {type === "textarea" ? (
                     <textarea
-                        ref={inputRef as any}
+                        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
                         onScroll={syncScroll}
@@ -118,7 +119,7 @@ export const VariableInput = forwardRef<HTMLInputElement | HTMLTextAreaElement, 
                     />
                 ) : (
                     <input
-                        ref={inputRef as any}
+                        ref={inputRef as React.RefObject<HTMLInputElement>}
                         type={type === "password" ? "password" : "text"}
                         value={value}
                         onChange={(e) => onChange(e.target.value)}

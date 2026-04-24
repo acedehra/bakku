@@ -13,6 +13,22 @@ import {
 import { SAVED_REQUESTS_STORAGE_KEY } from "../constants";
 import { HISTORY_STORAGE_KEY } from "../constants";
 
+/**
+ * Legacy request format from localStorage before migration
+ */
+interface LegacyRequestFormat {
+  id?: string;
+  name?: string;
+  method?: HttpMethod;
+  url?: string;
+  headers?: KVEntry[] | Record<string, string>;
+  body?: string;
+  auth?: AuthConfig;
+  folderId?: string | null;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 function buildHistoryMigrationPayload(): { folders: RequestFolder[]; requests: SavedRequest[] } | null {
   try {
     const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
@@ -60,7 +76,7 @@ async function tryMigrateLocalStorageToTauri(): Promise<boolean> {
   try {
     const stored = localStorage.getItem(SAVED_REQUESTS_STORAGE_KEY);
     if (stored) {
-      const data = JSON.parse(stored) as { requests: any[]; folders: RequestFolder[] };
+      const data = JSON.parse(stored) as { requests: LegacyRequestFormat[]; folders: RequestFolder[] };
       const folders = data.folders || [];
       const requests = (data.requests || []).map((r) => ({
         ...r,

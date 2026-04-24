@@ -5,7 +5,7 @@
  * such as environments and request history.
  */
 
-import { Environment } from "../types";
+import { Environment, RequestHistoryItem } from "../types";
 
 /**
  * Export data structure
@@ -14,7 +14,7 @@ export interface ExportData {
     version: string;
     exportedAt: string;
     environments?: Environment[];
-    history?: any[];
+    history?: RequestHistoryItem[];
 }
 
 /**

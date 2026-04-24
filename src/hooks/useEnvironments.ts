@@ -45,7 +45,7 @@ export function useEnvironments() {
         }
     }, [activeEnvId]);
 
-    const addEnvironment = (name: string) => {
+    const addEnvironment = (name: string): Environment => {
         const newEnv: Environment = {
             id: `env-${Date.now()}`,
             name,

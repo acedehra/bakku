@@ -322,6 +322,9 @@ export function setPerformanceMonitoringEnabled(enabled: boolean): void {
 
 /**
  * Decorator for measuring component render time
+ *
+ * Note: Uses `any` for constructor parameters which is acceptable for decorator pattern
+ * since we need to preserve the original constructor signature without knowing the exact types.
  */
 export function measureRender(componentName: string) {
     return function <T extends new (...args: any[]) => any>(constructor: T) {
