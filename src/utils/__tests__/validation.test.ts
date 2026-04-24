@@ -128,31 +128,38 @@ describe("validation", () => {
     });
 
     describe("validateHeaders", () => {
-        it("should accept empty headers object", () => {
-            const result = validateHeaders({});
+        it("should accept empty headers array", () => {
+            const result = validateHeaders([]);
             expect(result.isValid).toBe(true);
         });
 
         it("should validate multiple headers", () => {
-            const result = validateHeaders({
-                "Content-Type": "application/json",
-                Authorization: "Bearer token",
-            });
+            const result = validateHeaders([
+                { id: "1", key: "Content-Type", value: "application/json", enabled: true },
+                { id: "2", key: "Authorization", value: "Bearer token", enabled: true },
+            ]);
             expect(result.isValid).toBe(true);
         });
 
         it("should reject invalid header names", () => {
-            const result = validateHeaders({
-                "Invalid(Header)": "value",
-            });
+            const result = validateHeaders([
+                { id: "1", key: "Invalid(Header)", value: "value", enabled: true },
+            ]);
             expect(result.isValid).toBe(false);
         });
 
         it("should reject invalid header values", () => {
-            const result = validateHeaders({
-                "X-Custom": "value\x00",
-            });
+            const result = validateHeaders([
+                { id: "1", key: "X-Custom", value: "value\x00", enabled: true },
+            ]);
             expect(result.isValid).toBe(false);
+        });
+
+        it("should skip disabled headers", () => {
+            const result = validateHeaders([
+                { id: "1", key: "Invalid(Header)", value: "value", enabled: false },
+            ]);
+            expect(result.isValid).toBe(true);
         });
     });
 
@@ -308,23 +315,30 @@ describe("validation", () => {
 
     describe("validateParams", () => {
         it("should accept empty params", () => {
-            const result = validateParams({});
+            const result = validateParams([]);
             expect(result.isValid).toBe(true);
         });
 
         it("should validate multiple params", () => {
-            const result = validateParams({
-                page: "1",
-                limit: "10",
-            });
+            const result = validateParams([
+                { id: "1", key: "page", value: "1", enabled: true },
+                { id: "2", key: "limit", value: "10", enabled: true },
+            ]);
             expect(result.isValid).toBe(true);
         });
 
-        it("should reject invalid param keys", () => {
-            const result = validateParams({
-                "": "value",
-            });
+        it("should skip empty param keys", () => {
+            const result = validateParams([
+                { id: "1", key: "", value: "value", enabled: true },
+            ]);
             expect(result.isValid).toBe(true); // Empty keys are skipped
+        });
+
+        it("should skip disabled params", () => {
+            const result = validateParams([
+                { id: "1", key: "a".repeat(1025), value: "value", enabled: false },
+            ]);
+            expect(result.isValid).toBe(true);
         });
     });
 

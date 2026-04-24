@@ -34,7 +34,14 @@ function buildHistoryMigrationPayload(): { folders: RequestFolder[]; requests: S
         name: `${item.method} ${new Date(item.timestamp).toLocaleString()}`,
         method: item.method,
         url: item.requestData.url,
-        headers: item.requestData.headers,
+        headers: Array.isArray(item.requestData.headers)
+          ? item.requestData.headers
+          : Object.entries(item.requestData.headers || {}).map(([key, value]) => ({
+              id: crypto.randomUUID(),
+              key,
+              value,
+              enabled: true,
+            })),
         body: item.requestData.body,
         auth: item.requestData.auth,
         folderId: folder.id,
@@ -42,7 +49,7 @@ function buildHistoryMigrationPayload(): { folders: RequestFolder[]; requests: S
         updatedAt: item.timestamp,
       }));
 
-    return { folders: [folder], requests };
+    return { folders: [folder], requests: requests as SavedRequest[] };
   } catch {
     return null;
   }
@@ -52,11 +59,22 @@ async function tryMigrateLocalStorageToTauri(): Promise<boolean> {
   try {
     const stored = localStorage.getItem(SAVED_REQUESTS_STORAGE_KEY);
     if (stored) {
-      const data = JSON.parse(stored) as { requests: SavedRequest[]; folders: RequestFolder[] };
+      const data = JSON.parse(stored) as { requests: any[]; folders: RequestFolder[] };
       const folders = data.folders || [];
-      const requests = data.requests || [];
+      const requests = (data.requests || []).map((r) => ({
+        ...r,
+        headers: Array.isArray(r.headers)
+          ? r.headers
+          : Object.entries(r.headers || {}).map(([key, value]) => ({
+              id: crypto.randomUUID(),
+              key,
+              value,
+              enabled: true,
+            })),
+      }));
+      
       if (folders.length > 0 || requests.length > 0) {
-        await savedLibrary.importLibrary(folders, requests);
+        await savedLibrary.importLibrary(folders, requests as SavedRequest[]);
         localStorage.removeItem(SAVED_REQUESTS_STORAGE_KEY);
         return true;
       }

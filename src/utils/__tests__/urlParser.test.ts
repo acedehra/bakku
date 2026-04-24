@@ -4,6 +4,8 @@ import {
   getBaseUrl,
   parseUrlParams,
   buildUrlWithParams,
+  parseUrlParamsOrdered,
+  buildUrlWithOrderedParams,
 } from "../urlParser";
 
 describe("urlParser", () => {
@@ -210,6 +212,65 @@ describe("urlParser", () => {
       expect(result).toBe(
         "https://example.com?user%5Bname%5D=John&user%5Bage%5D=30"
       );
+    });
+  });
+
+  describe("parseUrlParamsOrdered", () => {
+    it("should return empty array for empty string", () => {
+      expect(parseUrlParamsOrdered("")).toEqual([]);
+    });
+
+    it("should parse multiple query params and preserve order", () => {
+      const result = parseUrlParamsOrdered("https://example.com?z=3&a=1&m=2");
+      expect(result.map(e => ({ key: e.key, value: e.value }))).toEqual([
+        { key: "z", value: "3" },
+        { key: "a", value: "1" },
+        { key: "m", value: "2" },
+      ]);
+    });
+
+    it("should handle duplicate keys", () => {
+      const result = parseUrlParamsOrdered("https://example.com?id=1&id=2");
+      expect(result.map(e => ({ key: e.key, value: e.value }))).toEqual([
+        { key: "id", value: "1" },
+        { key: "id", value: "2" },
+      ]);
+    });
+
+    it("should generate unique IDs for each entry", () => {
+      const result = parseUrlParamsOrdered("https://example.com?id=1&id=2");
+      expect(result[0].id).not.toBe(result[1].id);
+    });
+  });
+
+  describe("buildUrlWithOrderedParams", () => {
+    it("should return original URL when no params provided", () => {
+      const result = buildUrlWithOrderedParams("https://example.com", []);
+      expect(result).toBe("https://example.com");
+    });
+
+    it("should preserve order and duplicates", () => {
+      const result = buildUrlWithOrderedParams("https://example.com", [
+        { id: "1", key: "z", value: "3", enabled: true },
+        { id: "2", key: "id", value: "1", enabled: true },
+        { id: "3", key: "id", value: "2", enabled: true },
+      ]);
+      expect(result).toBe("https://example.com?z=3&id=1&id=2");
+    });
+
+    it("should respect the enabled flag", () => {
+      const result = buildUrlWithOrderedParams("https://example.com", [
+        { id: "1", key: "active", value: "true", enabled: true },
+        { id: "2", key: "hidden", value: "secret", enabled: false },
+      ]);
+      expect(result).toBe("https://example.com?active=true");
+    });
+
+    it("should handle hash fragments correctly", () => {
+      const result = buildUrlWithOrderedParams("https://example.com/page#section", [
+        { id: "1", key: "id", value: "123", enabled: true },
+      ]);
+      expect(result).toBe("https://example.com/page?id=123#section");
     });
   });
 });

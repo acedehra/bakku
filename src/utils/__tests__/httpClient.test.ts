@@ -110,7 +110,7 @@ describe("httpClient", () => {
     it("should return empty headers for None auth type", () => {
       const auth: AuthConfig = { type: "None" };
       const result = buildAuthHeaders(auth);
-      expect(result).toEqual({});
+      expect(result).toEqual([]);
     });
 
     it("should build Basic auth headers", () => {
@@ -120,8 +120,9 @@ describe("httpClient", () => {
         password: "pass",
       };
       const result = buildAuthHeaders(auth);
-      expect(result).toHaveProperty("Authorization");
-      expect(result.Authorization).toMatch(/^Basic /);
+      const authHeader = result.find(([k]) => k === "Authorization");
+      expect(authHeader).toBeDefined();
+      expect(authHeader![1]).toMatch(/^Basic /);
     });
 
     it("should use URL-safe encoding for Basic auth credentials", () => {
@@ -131,10 +132,11 @@ describe("httpClient", () => {
         password: "pass:word/space",
       };
       const result = buildAuthHeaders(auth);
-      expect(result).toHaveProperty("Authorization");
+      const authHeader = result.find(([k]) => k === "Authorization");
+      expect(authHeader).toBeDefined();
 
       // The credentials should be properly encoded
-      const credentials = result.Authorization.replace("Basic ", "");
+      const credentials = authHeader![1].replace("Basic ", "");
       const decoded = atob(credentials);
       expect(decoded).toContain("user%40domain.com");
       expect(decoded).toContain("pass%3Aword%2Fspace");
@@ -146,7 +148,7 @@ describe("httpClient", () => {
         token: "my-token",
       };
       const result = buildAuthHeaders(auth);
-      expect(result).toEqual({ Authorization: "Bearer my-token" });
+      expect(result).toEqual([["Authorization", "Bearer my-token"]]);
     });
 
     it("should build Custom auth headers", () => {
@@ -156,7 +158,7 @@ describe("httpClient", () => {
         headerValue: "custom-value",
       };
       const result = buildAuthHeaders(auth);
-      expect(result).toEqual({ "X-Custom-Auth": "custom-value" });
+      expect(result).toEqual([["X-Custom-Auth", "custom-value"]]);
     });
 
     it("should substitute variables in Basic auth", () => {
@@ -171,7 +173,7 @@ describe("httpClient", () => {
         password: "pass",
       };
       const result = buildAuthHeaders(auth, env);
-      expect(result).toHaveProperty("Authorization");
+      expect(result.find(([k]) => k === "Authorization")).toBeDefined();
     });
 
     it("should substitute variables in Bearer auth", () => {
@@ -185,7 +187,7 @@ describe("httpClient", () => {
         token: "{{token}}",
       };
       const result = buildAuthHeaders(auth, env);
-      expect(result).toEqual({ Authorization: "Bearer my-token" });
+      expect(result).toEqual([["Authorization", "Bearer my-token"]]);
     });
 
     it("should substitute variables in Custom auth", () => {
@@ -203,7 +205,7 @@ describe("httpClient", () => {
         headerValue: "{{headerValue}}",
       };
       const result = buildAuthHeaders(auth, env);
-      expect(result).toEqual({ "X-Auth": "value123" });
+      expect(result).toEqual([["X-Auth", "value123"]]);
     });
   });
 

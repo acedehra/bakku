@@ -26,8 +26,3 @@ vi.stubGlobal("performance", {
 vi.stubGlobal("btoa", (str: string) => {
   return Buffer.from(str).toString("base64");
 });
-
-// Mock encodeURIComponent
-vi.stubGlobal("encodeURIComponent", (str: string) => {
-  return globalThis.encodeURIComponent(str);
-});
