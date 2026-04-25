@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Folder, FolderOpen } from "lucide-react";
 import { RequestFolder, SavedRequest, HttpMethod } from "../../types";
 import RequestItem from "./RequestItem";
 
@@ -70,9 +70,14 @@ function FolderItem({
           />
         ) : (
           <>
-            <span className="text-xs font-medium text-foreground flex-1 truncate">
-              📁 {truncateName(folder.name)}
-            </span>
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <span className="text-muted-foreground">
+                {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
+              </span>
+              <span className="text-xs font-medium text-foreground truncate">
+                {truncateName(folder.name)}
+              </span>
+            </div>
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 type="button"

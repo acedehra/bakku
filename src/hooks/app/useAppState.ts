@@ -98,12 +98,24 @@ export function useAppState(): AppContextValue {
     handleSavedRequestSelect(newRequest);
   }, [createRequest, handleSavedRequestSelect]);
 
+  // Dialog state
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+
   const handleCreateFolder = useCallback(() => {
-    const name = prompt("Enter folder name:");
-    if (name && name.trim()) {
-      void createFolder(name.trim());
-    }
-  }, [createFolder]);
+    setFolderDialogOpen(true);
+  }, []);
+
+  const handleConfirmFolderName = useCallback(
+    (name: string) => {
+      setFolderDialogOpen(false);
+      void createFolder(name);
+    },
+    [createFolder]
+  );
+
+  const handleCancelFolderName = useCallback(() => {
+    setFolderDialogOpen(false);
+  }, []);
 
   const handleRenameFolder = useCallback((folder: RequestFolder, newName: string) => {
     void updateFolder({ ...folder, name: newName });
@@ -217,6 +229,8 @@ export function useAppState(): AppContextValue {
     handleSavedRequestSelect,
     handleCreateRequest,
     handleCreateFolder,
+    handleConfirmFolderName,
+    handleCancelFolderName,
     handleRenameFolder,
     handleRenameRequest,
     handleDeleteRequest,
@@ -229,5 +243,8 @@ export function useAppState(): AppContextValue {
     handleDeleteEnvironment,
     handleAddEnvironment,
     setSearchQuery,
+    // Dialog state
+    folderDialogOpen,
+    setFolderDialogOpen,
   };
 }
