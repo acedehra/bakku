@@ -148,9 +148,10 @@ fn row_to_saved_request(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedReques
     let auth: AuthConfig = serde_json::from_str(&auth_json)
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     let last_response = match last_response_json {
-        Some(s) if !s.is_empty() => Some(serde_json::from_str(&s).map_err(|e| {
-            rusqlite::Error::ToSqlConversionFailure(Box::new(e))
-        })?),
+        Some(s) if !s.is_empty() => Some(
+            serde_json::from_str(&s)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?,
+        ),
         _ => None,
     };
 
@@ -170,7 +171,9 @@ fn row_to_saved_request(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedReques
 }
 
 pub fn get_library(conn: &Connection) -> rusqlite::Result<LibrarySnapshot> {
-    let mut stmt = conn.prepare("SELECT id, name, created_at, updated_at FROM folders ORDER BY name COLLATE NOCASE")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, name, created_at, updated_at FROM folders ORDER BY name COLLATE NOCASE",
+    )?;
     let folders = stmt
         .query_map([], |row| row_to_folder(row))?
         .collect::<Result<Vec<_>, _>>()?;
@@ -189,12 +192,7 @@ pub fn get_library(conn: &Connection) -> rusqlite::Result<LibrarySnapshot> {
 pub fn insert_folder(conn: &Connection, folder: &RequestFolder) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT INTO folders (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        params![
-            folder.id,
-            folder.name,
-            folder.created_at,
-            folder.updated_at
-        ],
+        params![folder.id, folder.name, folder.created_at, folder.updated_at],
     )?;
     Ok(())
 }
@@ -222,9 +220,10 @@ fn request_to_params(req: &SavedRequest) -> rusqlite::Result<(String, String, Op
     let auth_json = serde_json::to_string(&req.auth)
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     let last_response_json = match &req.last_response {
-        Some(r) => Some(serde_json::to_string(r).map_err(|e| {
-            rusqlite::Error::ToSqlConversionFailure(Box::new(e))
-        })?),
+        Some(r) => Some(
+            serde_json::to_string(r)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?,
+        ),
         None => None,
     };
     Ok((headers_json, auth_json, last_response_json))

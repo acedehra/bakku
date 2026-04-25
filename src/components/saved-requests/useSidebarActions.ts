@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { SavedRequest, RequestFolder } from "../../types";
 
 export interface SidebarActions {
@@ -19,8 +20,8 @@ export interface SidebarActions {
     onRenameRequest?: (request: SavedRequest, newName: string) => void
   ) => void;
   handleBlurRename: () => void;
-  handleDeleteFolder: (id: string, e: React.MouseEvent, onDeleteFolder: (id: string) => void) => void;
-  handleDeleteRequest: (id: string, e: React.MouseEvent, onDeleteRequest: (id: string) => void) => void;
+  handleDeleteFolder: (id: string, e: React.MouseEvent, onDeleteFolder: (id: string) => void) => Promise<void>;
+  handleDeleteRequest: (id: string, e: React.MouseEvent, onDeleteRequest: (id: string) => void) => Promise<void>;
 }
 
 export function useSidebarActions(): SidebarActions {
@@ -79,24 +80,32 @@ export function useSidebarActions(): SidebarActions {
     }, 100);
   }, []);
 
-  const handleDeleteFolder = useCallback((
+  const handleDeleteFolder = useCallback(async (
     id: string,
     e: React.MouseEvent,
     onDeleteFolder: (id: string) => void
   ) => {
     e.stopPropagation();
-    if (confirm("Delete this folder and move all its requests to root?")) {
+    const confirmed = await confirm("Delete this folder and move all its requests to root?", {
+      title: "Confirm Delete",
+      kind: "warning",
+    });
+    if (confirmed) {
       onDeleteFolder(id);
     }
   }, []);
 
-  const handleDeleteRequest = useCallback((
+  const handleDeleteRequest = useCallback(async (
     id: string,
     e: React.MouseEvent,
     onDeleteRequest: (id: string) => void
   ) => {
     e.stopPropagation();
-    if (confirm("Delete this request?")) {
+    const confirmed = await confirm("Delete this request?", {
+      title: "Confirm Delete",
+      kind: "warning",
+    });
+    if (confirmed) {
       onDeleteRequest(id);
     }
   }, []);
