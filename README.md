@@ -59,6 +59,12 @@ bun run dev
 bun run build
 ```
 
+On Linux
+
+```
+__NV_DISABLE_EXPLICIT_SYNC=1 bun run tauri dev
+```
+
 ### Pre-built Binaries
 
 Download the latest release from the [GitHub Releases](https://github.com/acedehra/bakku/releases) page for your platform:

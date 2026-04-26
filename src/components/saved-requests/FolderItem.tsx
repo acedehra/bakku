@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Pencil, Trash2, Folder, FolderOpen } from "lucide-react";
+import { Pencil, Trash2, Folder, FolderOpen, ChevronRight, ChevronDown } from "lucide-react";
 import { RequestFolder, SavedRequest, HttpMethod } from "../../types";
 import RequestItem from "./RequestItem";
 
@@ -54,8 +54,8 @@ function FolderItem({
         className="flex items-center gap-1 p-1 rounded-md hover:bg-accent/30 cursor-pointer group"
         onClick={() => onToggle(folder.id)}
       >
-        <span className="text-xs text-muted-foreground w-4">
-          {isExpanded ? "▼" : "▶"}
+        <span className="text-muted-foreground w-4 flex items-center justify-center">
+          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
         {renamingFolderId === folder.id ? (
           <input
