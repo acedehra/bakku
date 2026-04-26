@@ -45,7 +45,7 @@ describe("FolderItem", () => {
     onStartRenameRequest: vi.fn(),
     onDeleteFolder: vi.fn(),
     onDeleteRequest: vi.fn(),
-    getMethodColor: (method: string) => "text-green-500",
+    getMethodColor: (_method: string) => "text-green-500",
     truncateName: (name: string) => name,
   };
 

@@ -32,7 +32,7 @@ describe("RequestItem", () => {
     onBlurRename: vi.fn(),
     onStartRename: vi.fn(),
     onDelete: vi.fn(),
-    getMethodColor: (method: string) => "text-green-500",
+    getMethodColor: (_method: string) => "text-green-500",
     truncateName: (name: string) => name,
   };
 
