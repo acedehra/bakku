@@ -24,4 +24,6 @@ jobs:
         run: bun install
         
       - name: Run tests
-        run: bun test
+        # Use "bun run test" instead of "bun test" to run vitest with jest-dom support
+        # "bun test" runs bun's built-in test runner which lacks jest-dom matchers
+        run: bun run test

@@ -158,10 +158,10 @@ bakku/
 
 ```bash
 # Run all tests
-bun test
+bun run test
 
 # Run tests in watch mode
-bun test --watch
+bun run test --watch
 
 # Run tests with UI
 bun run test:ui
@@ -169,6 +169,8 @@ bun run test:ui
 # Generate coverage report
 bun run test:coverage
 ```
+
+**Note**: Use `bun run test` instead of `bun test` to ensure vitest runs with jest-dom matchers. The `bun test` command uses bun's built-in test runner which lacks jest-dom support.
 
 ### Code Quality
 
@@ -212,7 +214,7 @@ We welcome contributions from the community! Please read our [Contributing Guide
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests and linting (`bun test && bun run lint`)
+4. Run tests and linting (`bun run test && bun run lint`)
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
