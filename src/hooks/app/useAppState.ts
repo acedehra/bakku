@@ -98,6 +98,24 @@ export function useAppState(): AppContextValue {
     handleSavedRequestSelect(newRequest);
   }, [createRequest, handleSavedRequestSelect]);
 
+  const handleCreateRequestInFolder = useCallback(async (folderId: string) => {
+    const newRequest = await createRequest("New Request", folderId);
+    handleSavedRequestSelect(newRequest);
+    // Auto-expand the folder
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      next.add(folderId);
+      return next;
+    });
+  }, [createRequest, handleSavedRequestSelect]);
+
+  const handleMoveRequestToFolder = useCallback((requestId: string, folderId: string | null) => {
+    const request = savedRequests.find((req) => req.id === requestId);
+    if (request && request.folderId !== folderId) {
+      void updateRequest({ ...request, folderId });
+    }
+  }, [savedRequests, updateRequest]);
+
   // Dialog state
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
 
@@ -236,6 +254,8 @@ export function useAppState(): AppContextValue {
     handleDeleteRequest,
     handleDeleteFolder,
     handleToggleFolder,
+    handleCreateRequestInFolder,
+    handleMoveRequestToFolder,
     setActiveEnvId,
     handleOpenEnvManager,
     handleCloseEnvManager,

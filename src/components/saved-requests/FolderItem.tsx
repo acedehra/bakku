@@ -1,7 +1,10 @@
 import { memo } from "react";
+import * as ContextMenu from "@radix-ui/react-context-menu";
+import { useDroppable } from "@dnd-kit/core";
 import { Pencil, Trash2, Folder, FolderOpen, ChevronRight, ChevronDown } from "lucide-react";
 import { RequestFolder, SavedRequest, HttpMethod } from "../../types";
 import RequestItem from "./RequestItem";
+import { RightClickMenu } from "../ui/RightClickMenu";
 
 interface FolderItemProps {
   folder: RequestFolder;
@@ -20,6 +23,7 @@ interface FolderItemProps {
   onStartRenameRequest: (request: SavedRequest, e: React.MouseEvent) => void;
   onDeleteFolder: (id: string, e: React.MouseEvent) => void;
   onDeleteRequest: (id: string, e: React.MouseEvent) => void;
+  onAddRequestToFolder?: (folderId: string) => void;
   getMethodColor: (method: HttpMethod) => string;
   truncateName: (name: string, maxLength?: number) => string;
 }
@@ -41,64 +45,81 @@ function FolderItem({
   onStartRenameRequest,
   onDeleteFolder,
   onDeleteRequest,
+  onAddRequestToFolder,
   getMethodColor,
   truncateName,
 }: FolderItemProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `folder-${folder.id}`,
+    data: {
+      type: 'folder',
+      folderId: folder.id,
+    },
+  });
 
   const folderRequests = requests.filter((req) => req.folderId === folder.id);
 
   return (
     <div className="mb-1">
-      {/* Folder header */}
-      <div
-        className="flex items-center gap-1 p-1 rounded-md hover:bg-accent/30 cursor-pointer group"
-        onClick={() => onToggle(folder.id)}
+      <RightClickMenu
+        items={[
+          {
+            id: 'rename',
+            label: 'Rename',
+            icon: <Pencil className="w-4 h-4" />,
+            onSelect: () => onStartRenameFolder(folder, { stopPropagation: () => {} } as React.MouseEvent),
+          },
+          {
+            id: 'add-request',
+            label: 'Add Request',
+            icon: <ContextMenu.Separator />,
+            onSelect: () => onAddRequestToFolder?.(folder.id),
+          },
+          {
+            id: 'delete',
+            label: 'Delete',
+            icon: <Trash2 className="w-4 h-4" />,
+            destructive: true,
+            onSelect: () => onDeleteFolder(folder.id, { stopPropagation: () => {} } as React.MouseEvent),
+          },
+        ]}
+        disabled={renamingFolderId === folder.id}
       >
-        <span className="text-muted-foreground w-4 flex items-center justify-center">
-          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </span>
-        {renamingFolderId === folder.id ? (
-          <input
-            type="text"
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={onSaveRename}
-            onBlur={onBlurRename}
-            onClick={(e) => e.stopPropagation()}
-            autoFocus
-            className="flex-1 h-6 px-1 text-xs bg-background border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        ) : (
-          <>
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <span className="text-muted-foreground">
-                {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
-              </span>
-              <span className="text-xs font-medium text-foreground truncate">
-                {truncateName(folder.name)}
-              </span>
-            </div>
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                type="button"
-                onClick={(e) => onStartRenameFolder(folder, e)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                title="Rename"
-              >
-                <Pencil className="size-4 shrink-0" strokeWidth={2} aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => onDeleteFolder(folder.id, e)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                title="Delete"
-              >
-                <Trash2 className="size-4 shrink-0" strokeWidth={2} aria-hidden />
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+        <div
+          ref={setNodeRef}
+          className={`flex items-center gap-1 p-1 rounded-md hover:bg-accent/30 cursor-pointer group transition-colors ${
+            isOver ? "bg-accent/60" : ""
+          }`}
+          onClick={() => onToggle(folder.id)}
+        >
+          <span className="text-muted-foreground w-4 flex items-center justify-center">
+            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
+          {renamingFolderId === folder.id ? (
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={onSaveRename}
+              onBlur={onBlurRename}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+              className="flex-1 h-6 px-1 text-xs bg-background border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <span className="text-muted-foreground">
+                  {isExpanded ? <FolderOpen size={14} /> : <Folder size={14} />}
+                </span>
+                <span className="text-xs font-medium text-foreground truncate">
+                  {truncateName(folder.name)}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </RightClickMenu>
 
       {/* Folder requests */}
       {isExpanded && (

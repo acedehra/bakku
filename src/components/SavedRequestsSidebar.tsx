@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { DndContext, DragEndEvent, useDroppable } from "@dnd-kit/core";
 import { SavedRequest, RequestFolder, HttpMethod } from "../types";
 import { SidebarSearch } from "./saved-requests/SidebarSearch";
 import { SidebarCreateMenu } from "./saved-requests/SidebarCreateMenu";
@@ -7,6 +8,7 @@ import { useSidebarActions } from "./saved-requests/useSidebarActions";
 import { useDebounce } from "../hooks/useDebounce";
 import FolderItem from "./saved-requests/FolderItem";
 import RequestItem from "./saved-requests/RequestItem";
+import { DragOverlay } from "./saved-requests/DragOverlay";
 
 interface SavedRequestsSidebarProps {
   savedRequests: SavedRequest[];
@@ -23,6 +25,8 @@ interface SavedRequestsSidebarProps {
   onSearchChange: (query: string) => void;
   onRenameFolder?: (folder: RequestFolder, newName: string) => void;
   onRenameRequest?: (request: SavedRequest, newName: string) => void;
+  onCreateRequestInFolder?: (folderId: string) => void;
+  onMoveRequestToFolder?: (requestId: string, folderId: string | null) => void;
 }
 
 export function SavedRequestsSidebar({
@@ -40,10 +44,38 @@ export function SavedRequestsSidebar({
   onSearchChange,
   onRenameFolder,
   onRenameRequest,
+  onCreateRequestInFolder,
+  onMoveRequestToFolder,
 }: SavedRequestsSidebarProps) {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const filteredData = useRequestFilter(savedRequests, folders, debouncedSearchQuery);
   const sidebarActions = useSidebarActions();
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overData = over.data.current as { type: string; folderId?: string } | null;
+
+    if (!overData) return;
+
+    const request = savedRequests.find((req) => req.id === activeId);
+    if (!request) return;
+
+    // Only allow dropping on folders or root
+    if (overData.type === 'folder') {
+      const targetFolderId = overData.folderId ?? null;
+      // Check if we're moving to a different folder
+      if (request.folderId !== targetFolderId) {
+        onMoveRequestToFolder?.(activeId, targetFolderId);
+        // Auto-expand the target folder
+        if (targetFolderId) {
+          onToggleFolder(targetFolderId);
+        }
+      }
+    }
+  }, [savedRequests, onMoveRequestToFolder, onToggleFolder]);
 
   const getMethodColor = useCallback((method: HttpMethod): string => {
     switch (method) {
@@ -79,20 +111,42 @@ export function SavedRequestsSidebar({
 
   const rootRequests = filteredData.requests.filter((req) => !req.folderId);
 
+  function RootDropZone({ children }: { children: React.ReactNode }) {
+    const { setNodeRef, isOver } = useDroppable({
+      id: 'root',
+      data: {
+        type: 'root',
+        folderId: null,
+      },
+    });
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={`flex-1 overflow-y-auto transition-colors ${
+          isOver ? "bg-accent/20" : ""
+        }`}
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-screen flex flex-col bg-background border-r border-border">
-      <SidebarSearch value={searchQuery} onChange={onSearchChange} />
-      {/* Note: Search filtering is debounced via debouncedSearchQuery for performance */}
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="w-full h-screen flex flex-col bg-background border-r border-border">
+        <SidebarSearch value={searchQuery} onChange={onSearchChange} />
+        {/* Note: Search filtering is debounced via debouncedSearchQuery for performance */}
 
-      <SidebarCreateMenu
-        open={sidebarActions.createMenuOpen}
-        onToggle={() => sidebarActions.setCreateMenuOpen(!sidebarActions.createMenuOpen)}
-        onClose={() => sidebarActions.setCreateMenuOpen(false)}
-        onCreateRequest={onCreateRequest}
-        onCreateFolder={onCreateFolder}
-      />
+        <SidebarCreateMenu
+          open={sidebarActions.createMenuOpen}
+          onToggle={() => sidebarActions.setCreateMenuOpen(!sidebarActions.createMenuOpen)}
+          onClose={() => sidebarActions.setCreateMenuOpen(false)}
+          onCreateRequest={onCreateRequest}
+          onCreateFolder={onCreateFolder}
+        />
 
-      <div className="flex-1 overflow-y-auto">
+        <RootDropZone>
         {filteredData.requests.length === 0 && filteredData.folders.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
             {searchQuery ? "No results found" : "No saved requests yet"}
@@ -118,6 +172,7 @@ export function SavedRequestsSidebar({
                 onStartRenameRequest={sidebarActions.handleStartRenameRequest}
                 onDeleteFolder={(id, e) => sidebarActions.handleDeleteFolder(id, e, onDeleteFolder)}
                 onDeleteRequest={(id, e) => sidebarActions.handleDeleteRequest(id, e, onDeleteRequest)}
+                onAddRequestToFolder={onCreateRequestInFolder}
                 getMethodColor={getMethodColor}
                 truncateName={truncateName}
               />
@@ -149,7 +204,9 @@ export function SavedRequestsSidebar({
             )}
           </div>
         )}
+        </RootDropZone>
+        <DragOverlay requests={filteredData.requests} getMethodColor={getMethodColor} />
       </div>
-    </div>
+    </DndContext>
   );
 }

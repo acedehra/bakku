@@ -52,6 +52,8 @@ export interface AppActions {
   handleDeleteRequest: (id: string) => void;
   handleDeleteFolder: (id: string) => void;
   handleToggleFolder: (folderId: string) => void;
+  handleCreateRequestInFolder?: (folderId: string) => void;
+  handleMoveRequestToFolder?: (requestId: string, folderId: string | null) => void;
 
   // Dialog state
   folderDialogOpen: boolean;

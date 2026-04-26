@@ -25,6 +25,8 @@ function AppLayout(props: AppLayoutProps) {
     setSearchQuery,
     handleRenameFolder,
     handleRenameRequest,
+    handleCreateRequestInFolder,
+    handleMoveRequestToFolder,
     method,
     url,
     headers,
@@ -77,6 +79,8 @@ function AppLayout(props: AppLayoutProps) {
           onSearchChange={setSearchQuery}
           onRenameFolder={handleRenameFolder}
           onRenameRequest={handleRenameRequest}
+          onCreateRequestInFolder={handleCreateRequestInFolder}
+          onMoveRequestToFolder={handleMoveRequestToFolder}
         />
       </div>
       <ResizeHandle onResize={handleSidebarResize} />
